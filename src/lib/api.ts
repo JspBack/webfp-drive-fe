@@ -47,6 +47,10 @@ export function startGitHubLogin() {
   window.location.assign(`${apiBaseURL}/api/v1/auth/github`);
 }
 
+export function startGoogleLogin() {
+  window.location.assign(`${apiBaseURL}/api/v1/auth/google`);
+}
+
 export async function apiRequest(path: string, init: RequestInit = {}) {
   const request = (token: string | null) => {
     const headers = new Headers(init.headers);
