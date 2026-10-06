@@ -4,11 +4,11 @@ metadata:
   name: webfp-fe
   namespace: webfp
   annotations:
+    kubernetes.io/ingress.class: gce
     kubernetes.io/ingress.global-static-ip-name: webfp-ip
     networking.gke.io/managed-certificates: webfp-cert
     networking.gke.io/v1beta1.FrontendConfig: webfp-fe-frontend
 spec:
-  ingressClassName: gce
   rules:
     - host: webfp.dpdns.org
       http:

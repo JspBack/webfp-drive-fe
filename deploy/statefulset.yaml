@@ -8,6 +8,9 @@ metadata:
 spec:
   serviceName: webfp-fe
   replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  minReadySeconds: 30
   selector:
     matchLabels:
       app: webfp-fe
