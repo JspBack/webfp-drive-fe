@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: webfp-fe
+  namespace: webfp
+  labels:
+    app: webfp-fe
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: webfp-fe

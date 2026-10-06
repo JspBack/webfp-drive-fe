@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webfp-fe
+  namespace: webfp
+  labels:
+    app: webfp-fe
+spec:
+  type: ClusterIP
+  selector:
+    app: webfp-fe
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
