@@ -24,8 +24,8 @@ spec:
         runAsNonRoot: true
       containers:
         - name: fe
-          image: webfp-fe:local
-          imagePullPolicy: IfNotPresent
+          image: europe-west1-docker.pkg.dev/webfp-510817/webfp/webfp-fe:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080

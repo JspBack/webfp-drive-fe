@@ -5,6 +5,9 @@ metadata:
   namespace: webfp
   labels:
     app: webfp-fe
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "webfp-fe-be"}'
 spec:
   type: ClusterIP
   selector:

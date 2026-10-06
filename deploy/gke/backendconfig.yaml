@@ -1,0 +1,7 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: webfp-fe-be
+  namespace: webfp
+spec:
+  timeoutSec: 300

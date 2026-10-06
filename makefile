@@ -1,9 +1,8 @@
-.PHONY: all install build run lint clean preview image deploy expose
+.PHONY: all install build run lint clean preview image expose deploy-gke
 
 all: clean lint build run
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-CLUSTER_NAME := k8squest
 LOCAL_PORT := 8080
 
 install:
@@ -26,14 +25,12 @@ clean:
 
 image:
 	docker build -t webfp-fe:$(VERSION) .
-	docker tag webfp-fe:$(VERSION) webfp-fe:local
 
-deploy: image
-	kind load docker-image webfp-fe:$(VERSION) webfp-fe:local --name $(CLUSTER_NAME)
+deploy-gke:
 	kubectl apply -f deploy/ns.yaml
-	kubectl apply -f deploy/
-	kubectl -n webfp set image statefulset/webfp-fe fe=webfp-fe:$(VERSION)
-	kubectl -n webfp rollout status statefulset/webfp-fe --timeout=120s
+	kubectl apply -f deploy/ -f deploy/gke/
+	kubectl -n webfp rollout restart statefulset/webfp-fe
+	kubectl -n webfp rollout status statefulset/webfp-fe --timeout=180s
 
 expose:
 	@echo "FE ready at http://localhost:$(LOCAL_PORT) (Ctrl+C to stop)"

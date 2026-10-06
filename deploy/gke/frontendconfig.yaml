@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: webfp-fe-frontend
+  namespace: webfp
+spec:
+  redirectToHttps:
+    enabled: true
