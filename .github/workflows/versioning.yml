@@ -1,0 +1,89 @@
+name: versioning
+
+on:
+  push:
+    branches: [stable]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: lint
+        run: pnpm lint
+
+      - name: build
+        run: pnpm build
+
+      - name: bump and tag
+        id: bump
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW=v0.0.1
+          else
+            NEW=v$(echo "$LATEST" | cut -d. -f1 | tr -d v).$(echo "$LATEST" | cut -d. -f2).$(($(echo "$LATEST" | cut -d. -f3)+1))
+          fi
+          git tag "$NEW" && git push --tags
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: tag
+    runs-on: ubuntu-latest
+    env:
+      REGION: europe-west1
+      REPO: webfp
+      IMAGE: webfp-fe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ needs.tag.outputs.version }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

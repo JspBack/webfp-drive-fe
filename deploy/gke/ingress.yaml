@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webfp-fe
+  namespace: webfp
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: webfp-ip
+    networking.gke.io/managed-certificates: webfp-cert
+    networking.gke.io/v1beta1.FrontendConfig: webfp-fe-frontend
+spec:
+  ingressClassName: gce
+  rules:
+    - host: webfp.dpdns.org
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: webfp-fe
+                port:
+                  number: 80

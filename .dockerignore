@@ -1,0 +1,27 @@
+# vcs
+.github
+
+# secrets
+.env
+.env.*
+
+# deps / build output
+node_modules
+dist
+*.local
+
+# tooling
+.vscode
+.idea
+.eslintcache
+
+# logs
+logs
+*.log
+
+# docs / deploy
+*.md
+deploy/
+makefile
+Dockerfile
+.dockerignore
