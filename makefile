@@ -30,7 +30,7 @@ deploy-gke:
 	kubectl apply -f deploy/ns.yaml
 	kubectl apply -f deploy/ -f deploy/gke/
 	kubectl -n webfp rollout restart statefulset/webfp-fe
-	kubectl -n webfp rollout status statefulset/webfp-fe --timeout=180s
+	kubectl -n webfp rollout status statefulset/webfp-fe --timeout=300s
 
 expose:
 	@echo "FE ready at http://localhost:$(LOCAL_PORT) (Ctrl+C to stop)"

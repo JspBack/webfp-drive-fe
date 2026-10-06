@@ -87,3 +87,22 @@ jobs:
             ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Authenticate to GCP and get cluster credentials
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          printf '%s' "$GCP_SA_KEY" > "${RUNNER_TEMP}/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="${RUNNER_TEMP}/gcp-sa.json" --quiet
+          gcloud container clusters get-credentials webfp --region europe-west1 --project "${GCP_PROJECT_ID}"
+
+      - name: Rolling deploy to GKE
+        run: make deploy-gke
