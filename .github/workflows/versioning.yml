@@ -94,6 +94,8 @@ jobs:
   deploy:
     needs: publish
     runs-on: ubuntu-latest
+    env:
+      IMAGE: europe-west1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/webfp/webfp-fe
     steps:
       - uses: actions/checkout@v7
 
@@ -111,3 +113,10 @@ jobs:
 
       - name: Rolling deploy to GKE
         run: make deploy-gke
+
+      - name: Keep last 3 images
+        run: |
+          gcloud artifacts docker images list "$IMAGE" --format='json(version,createTime)' \
+            | jq -r 'sort_by(.createTime) | reverse | .[3:] | .[].version' \
+            | sed "s|^|$IMAGE@|" \
+            | xargs -r gcloud artifacts docker images delete --quiet --delete-tags
