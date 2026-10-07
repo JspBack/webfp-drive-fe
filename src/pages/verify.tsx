@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { resendVerification, verifyEmail } from '../lib/api';
 
@@ -45,7 +45,9 @@ export function Verify() {
       await resendVerification(email.trim());
       setNotice('A new code is on its way. Check your inbox.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not resend the code.');
+      setError(
+        cause instanceof Error ? cause.message : 'Could not resend the code.',
+      );
     } finally {
       setResending(false);
     }
@@ -56,7 +58,12 @@ export function Verify() {
       <div className="flex items-center justify-between">
         <Link className="inline-flex w-fit items-center gap-3" to="/">
           <span className="grid size-10 place-items-center rounded-xl bg-blue-700 text-white shadow-lg shadow-blue-950/15">
-            <svg aria-hidden="true" className="size-5" fill="none" viewBox="0 0 24 24">
+            <svg
+              aria-hidden="true"
+              className="size-5"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
               <path
                 d="m8.5 3.75-6 10.5 3.75 6.5h12l3.25-5.75-6.5-11.25h-6.5Z"
                 stroke="currentColor"
@@ -71,7 +78,9 @@ export function Verify() {
               />
             </svg>
           </span>
-          <span className="text-base font-semibold tracking-tight text-slate-900">WebFP Drive</span>
+          <span className="text-base font-semibold tracking-tight text-slate-900">
+            WebFP Drive
+          </span>
         </Link>
         <Link
           className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
@@ -83,19 +92,25 @@ export function Verify() {
 
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
         <div className="mb-9">
-          <p className="mb-3 text-sm font-semibold tracking-wide text-blue-700">VERIFY YOUR EMAIL</p>
+          <p className="mb-3 text-sm font-semibold tracking-wide text-blue-700">
+            VERIFY YOUR EMAIL
+          </p>
           <h1 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
             Check your inbox
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            Enter the six-digit code we emailed you to finish creating your account.
-            {typeof state.expiresInMinutes === 'number' && ` The code expires in ${state.expiresInMinutes} minutes.`}
+            Enter the six-digit code we emailed you to finish creating your
+            account.
+            {typeof state.expiresInMinutes === 'number' &&
+              ` The code expires in ${state.expiresInMinutes} minutes.`}
           </p>
         </div>
 
         <form className="space-y-5" onSubmit={submit}>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Email address</span>
+            <span className="mb-2 block text-sm font-medium text-slate-700">
+              Email address
+            </span>
             <input
               autoComplete="email"
               className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
@@ -107,13 +122,17 @@ export function Verify() {
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Verification code</span>
+            <span className="mb-2 block text-sm font-medium text-slate-700">
+              Verification code
+            </span>
             <input
               autoComplete="one-time-code"
               className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-center font-mono text-lg font-semibold tracking-[0.4em] text-slate-900 outline-none transition placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               inputMode="numeric"
               maxLength={6}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(event) =>
+                setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+              }
               pattern="[0-9]*"
               placeholder="000000"
               required
@@ -151,7 +170,10 @@ export function Verify() {
           >
             {resending ? 'Sending…' : 'Resend code'}
           </button>
-          <Link className="text-slate-500 transition hover:text-slate-900" to="/auth/sign-up">
+          <Link
+            className="text-slate-500 transition hover:text-slate-900"
+            to="/auth/sign-up"
+          >
             Use a different email
           </Link>
         </div>

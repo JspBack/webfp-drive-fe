@@ -31,7 +31,10 @@ export class VerificationRequiredError extends Error {
   }
 }
 
-async function startSession(path: string, credentials: Credentials): Promise<void> {
+async function startSession(
+  path: string,
+  credentials: Credentials,
+): Promise<void> {
   const response = await fetch(`${apiBaseURL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,7 +42,9 @@ async function startSession(path: string, credentials: Credentials): Promise<voi
   });
   const result = await readJSON<
     Partial<AuthSession> & { error?: string; code?: string }
-  >(response).catch(() => ({}) as Partial<AuthSession> & { error?: string; code?: string });
+  >(response).catch(
+    () => ({}) as Partial<AuthSession> & { error?: string; code?: string },
+  );
   if (response.status === 403 && result.code === 'email_not_verified') {
     throw new VerificationRequiredError(credentials.email);
   }
@@ -53,15 +58,21 @@ export async function signIn(email: string, password: string): Promise<void> {
   await startSession('/api/v1/auth/login', { email, password });
 }
 
-export async function register(name: string, email: string, password: string): Promise<VerificationChallenge> {
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+): Promise<VerificationChallenge> {
   const response = await fetch(`${apiBaseURL}/api/v1/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, name }),
   });
-  const result = await readJSON<Partial<VerificationChallenge> & { error?: string }>(
-    response,
-  ).catch(() => ({}) as Partial<VerificationChallenge> & { error?: string });
+  const result = await readJSON<
+    Partial<VerificationChallenge> & { error?: string }
+  >(response).catch(
+    () => ({}) as Partial<VerificationChallenge> & { error?: string },
+  );
   if (!response.ok || !result.email) {
     throw new Error(result.error ?? `Registration failed (${response.status})`);
   }
@@ -88,16 +99,21 @@ export async function verifyEmail(email: string, code: string): Promise<void> {
 }
 
 export async function resendVerification(email: string): Promise<void> {
-  const response = await fetch(`${apiBaseURL}/api/v1/auth/resend-verification`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  const result = await readJSON<{ message?: string; error?: string }>(response).catch(
-    () => ({}) as { message?: string; error?: string },
+  const response = await fetch(
+    `${apiBaseURL}/api/v1/auth/resend-verification`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    },
   );
+  const result = await readJSON<{ message?: string; error?: string }>(
+    response,
+  ).catch(() => ({}) as { message?: string; error?: string });
   if (!response.ok) {
-    throw new Error(result.error ?? `Could not resend the code (${response.status})`);
+    throw new Error(
+      result.error ?? `Could not resend the code (${response.status})`,
+    );
   }
 }
 
@@ -129,8 +145,14 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
-  const refreshed = await readJSON<AuthSession | { error?: string }>(refreshResponse);
-  if (!refreshResponse.ok || !('token' in refreshed) || !('refresh_token' in refreshed)) {
+  const refreshed = await readJSON<AuthSession | { error?: string }>(
+    refreshResponse,
+  );
+  if (
+    !refreshResponse.ok ||
+    !('token' in refreshed) ||
+    !('refresh_token' in refreshed)
+  ) {
     clearAPISession();
     return response;
   }

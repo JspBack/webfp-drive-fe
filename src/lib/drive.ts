@@ -82,7 +82,9 @@ function scoped(path: string, param: string, id?: string | null): string {
   return id ? `${path}?${param}=${encodeURIComponent(id)}` : path;
 }
 
-export async function listFolders(parentId?: string | null): Promise<DriveFolder[]> {
+export async function listFolders(
+  parentId?: string | null,
+): Promise<DriveFolder[]> {
   const response = await expect(
     await request(scoped('/api/v1/folders', 'parent_id', parentId)),
     'Unable to load folders.',
@@ -90,7 +92,9 @@ export async function listFolders(parentId?: string | null): Promise<DriveFolder
   return (await response.json()) as DriveFolder[];
 }
 
-export async function listFiles(folderId?: string | null): Promise<DriveFile[]> {
+export async function listFiles(
+  folderId?: string | null,
+): Promise<DriveFile[]> {
   const response = await expect(
     await request(scoped('/api/v1/files', 'folder_id', folderId)),
     'Unable to load files.',
@@ -106,7 +110,10 @@ export async function getFolder(id: string): Promise<DriveFolder> {
   return (await response.json()) as DriveFolder;
 }
 
-export async function createFolder(name: string, parentId: string | null): Promise<DriveFolder> {
+export async function createFolder(
+  name: string,
+  parentId: string | null,
+): Promise<DriveFolder> {
   const response = await expect(
     await request('/api/v1/folders', {
       method: 'POST',
@@ -118,7 +125,10 @@ export async function createFolder(name: string, parentId: string | null): Promi
   return (await response.json()) as DriveFolder;
 }
 
-export async function moveFolder(id: string, parentId: string | null): Promise<void> {
+export async function moveFolder(
+  id: string,
+  parentId: string | null,
+): Promise<void> {
   await expect(
     await request(`/api/v1/folders/${id}`, {
       method: 'PATCH',
@@ -136,7 +146,10 @@ export async function deleteFolder(id: string): Promise<void> {
   );
 }
 
-export async function moveFile(id: string, folderId: string | null): Promise<void> {
+export async function moveFile(
+  id: string,
+  folderId: string | null,
+): Promise<void> {
   await expect(
     await request(`/api/v1/files/${id}`, {
       method: 'PATCH',
@@ -148,10 +161,16 @@ export async function moveFile(id: string, folderId: string | null): Promise<voi
 }
 
 export async function deleteFile(id: string): Promise<void> {
-  await expect(await request(`/api/v1/files/${id}`, { method: 'DELETE' }), 'Unable to delete the file.');
+  await expect(
+    await request(`/api/v1/files/${id}`, { method: 'DELETE' }),
+    'Unable to delete the file.',
+  );
 }
 
-export async function uploadFiles(files: File[], folderId: string | null): Promise<void> {
+export async function uploadFiles(
+  files: File[],
+  folderId: string | null,
+): Promise<void> {
   for (const file of files) {
     const form = new FormData();
     form.append('file', file, file.name);
@@ -168,7 +187,8 @@ export async function createShare(
   options: { expiresAt: string; maxDownloads?: number; password?: string },
 ): Promise<ShareLink> {
   const body: Record<string, unknown> = { expires_at: options.expiresAt };
-  if (options.maxDownloads !== undefined) body.max_downloads = options.maxDownloads;
+  if (options.maxDownloads !== undefined)
+    body.max_downloads = options.maxDownloads;
   if (options.password) body.password = options.password;
   const response = await expect(
     await request(`/api/v1/files/${fileId}/shares`, {
@@ -182,12 +202,18 @@ export async function createShare(
 }
 
 export async function getStorageUsage(): Promise<StorageUsage> {
-  const response = await expect(await request('/api/v1/users/me/usage'), 'Unable to load storage usage.');
+  const response = await expect(
+    await request('/api/v1/users/me/usage'),
+    'Unable to load storage usage.',
+  );
   return (await response.json()) as StorageUsage;
 }
 
 export async function listShares(): Promise<ShareListItem[]> {
-  const response = await expect(await request('/api/v1/shares'), 'Unable to load your share links.');
+  const response = await expect(
+    await request('/api/v1/shares'),
+    'Unable to load your share links.',
+  );
   return (await response.json()) as ShareListItem[];
 }
 
