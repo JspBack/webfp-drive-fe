@@ -1,9 +1,22 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
 import type { DriveFile, ShareLink, ShareListItem } from '../lib/drive';
-import { createShare, createFolder, listShares, revokeShare } from '../lib/drive';
+import {
+  createFolder,
+  createShare,
+  listShares,
+  revokeShare,
+} from '../lib/drive';
 import { formatDate } from '../lib/format';
-import { CopyIcon, LinkIcon, PlusIcon, ShareIcon, Spinner, TrashIcon, XIcon } from './icons';
+import {
+  CopyIcon,
+  LinkIcon,
+  PlusIcon,
+  ShareIcon,
+  Spinner,
+  TrashIcon,
+  XIcon,
+} from './icons';
 
 function messageOf(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
@@ -46,10 +59,17 @@ export function Modal({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-slate-950" id="modal-title">
+            <h2
+              className="text-lg font-semibold tracking-tight text-slate-950"
+              id="modal-title"
+            >
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>}
+            {description && (
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                {description}
+              </p>
+            )}
           </div>
           <button
             aria-label="Close"
@@ -125,7 +145,10 @@ export function ConfirmDialog({
       title={title}
     >
       {error && (
-        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+        <p
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -192,8 +215,15 @@ export function NewFolderDialog({
       onClose={onClose}
       title="New folder"
     >
-      <form className="mt-5" id="new-folder-form" onSubmit={(event) => void submit(event)}>
-        <label className="block text-sm font-medium text-slate-700" htmlFor="folder-name">
+      <form
+        className="mt-5"
+        id="new-folder-form"
+        onSubmit={(event) => void submit(event)}
+      >
+        <label
+          className="block text-sm font-medium text-slate-700"
+          htmlFor="folder-name"
+        >
           Folder name
         </label>
         <input
@@ -205,7 +235,10 @@ export function NewFolderDialog({
           value={name}
         />
         {error && (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+          <p
+            className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -221,7 +254,13 @@ const EXPIRY_CHOICES = [
   { value: '30d', label: 'In 30 days', hours: 24 * 30 },
 ] as const;
 
-export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () => void }) {
+export function ShareDialog({
+  file,
+  onClose,
+}: {
+  file: DriveFile;
+  onClose: () => void;
+}) {
   const [expiry, setExpiry] = useState<string>('24h');
   const [maxDownloads, setMaxDownloads] = useState('');
   const [password, setPassword] = useState('');
@@ -232,7 +271,8 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const choice = EXPIRY_CHOICES.find((item) => item.value === expiry) ?? EXPIRY_CHOICES[1];
+    const choice =
+      EXPIRY_CHOICES.find((item) => item.value === expiry) ?? EXPIRY_CHOICES[1];
     const trimmedMax = maxDownloads.trim();
     let max: number | undefined;
     if (trimmedMax) {
@@ -247,7 +287,9 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
     setError('');
     try {
       const created = await createShare(file.id, {
-        expiresAt: new Date(Date.now() + choice.hours * 3_600_000).toISOString(),
+        expiresAt: new Date(
+          Date.now() + choice.hours * 3_600_000,
+        ).toISOString(),
         maxDownloads: max,
         password: password || undefined,
       });
@@ -281,7 +323,10 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
             Expires {new Date(share.expires_at).toLocaleString()}
           </p>
         </div>
-        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="share-url">
+        <label
+          className="mt-4 block text-sm font-medium text-slate-700"
+          htmlFor="share-url"
+        >
           Link
         </label>
         <div className="mt-2 flex gap-2">
@@ -301,7 +346,10 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
           </button>
         </div>
         {error && (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+          <p
+            className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -319,10 +367,17 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
   }
 
   return (
-    <Modal description={`Create a link that lets anyone download “${file.filename}”.`} onClose={onClose} title="Share file">
+    <Modal
+      description={`Create a link that lets anyone download “${file.filename}”.`}
+      onClose={onClose}
+      title="Share file"
+    >
       <form className="mt-5 space-y-4" onSubmit={(event) => void submit(event)}>
         <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="share-expiry">
+          <label
+            className="block text-sm font-medium text-slate-700"
+            htmlFor="share-expiry"
+          >
             Link expires
           </label>
           <select
@@ -339,8 +394,12 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="share-max">
-            Maximum downloads <span className="font-normal text-slate-400">(optional)</span>
+          <label
+            className="block text-sm font-medium text-slate-700"
+            htmlFor="share-max"
+          >
+            Maximum downloads{' '}
+            <span className="font-normal text-slate-400">(optional)</span>
           </label>
           <input
             className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
@@ -353,8 +412,12 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="share-password">
-            Password <span className="font-normal text-slate-400">(optional)</span>
+          <label
+            className="block text-sm font-medium text-slate-700"
+            htmlFor="share-password"
+          >
+            Password{' '}
+            <span className="font-normal text-slate-400">(optional)</span>
           </label>
           <input
             className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
@@ -366,7 +429,10 @@ export function ShareDialog({ file, onClose }: { file: DriveFile; onClose: () =>
           />
         </div>
         {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+          <p
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -419,7 +485,10 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
     try {
       await navigator.clipboard.writeText(share.url);
       setCopiedId(share.id);
-      setTimeout(() => setCopiedId((id) => (id === share.id ? null : id)), 2_000);
+      setTimeout(
+        () => setCopiedId((id) => (id === share.id ? null : id)),
+        2_000,
+      );
     } catch {
       setError('Copy failed — select the link and copy it manually.');
     }
@@ -430,7 +499,9 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       await revokeShare(share.id);
-      setShares((items) => (items ?? []).filter((item) => item.id !== share.id));
+      setShares((items) =>
+        (items ?? []).filter((item) => item.id !== share.id),
+      );
     } catch (cause) {
       setError(messageOf(cause, 'Unable to revoke that share link.'));
     } finally {
@@ -454,7 +525,10 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {error && (
-        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700" role="alert">
+        <p
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -469,7 +543,9 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
               <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-slate-100 text-slate-500">
                 <LinkIcon className="size-5" />
               </span>
-              <p className="mt-3 text-sm font-semibold text-slate-900">No active share links</p>
+              <p className="mt-3 text-sm font-semibold text-slate-900">
+                No active share links
+              </p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 Create one from a file's actions menu.
               </p>
@@ -478,14 +554,23 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <ul className="space-y-3" data-testid="share-list">
             {shares.map((share) => (
-              <li className="rounded-2xl border border-slate-200 p-3.5" data-testid="share-row" key={share.id}>
+              <li
+                className="rounded-2xl border border-slate-200 p-3.5"
+                data-testid="share-row"
+                key={share.id}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{share.filename}</p>
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {share.filename}
+                    </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Expires {formatDate(share.expires_at)} · {share.download_count}{' '}
+                      Expires {formatDate(share.expires_at)} ·{' '}
+                      {share.download_count}{' '}
                       {share.download_count === 1 ? 'download' : 'downloads'}
-                      {share.max_downloads > 0 ? ` of ${share.max_downloads}` : ''}
+                      {share.max_downloads > 0
+                        ? ` of ${share.max_downloads}`
+                        : ''}
                       {share.has_password ? ' · password protected' : ''}
                     </p>
                   </div>
@@ -515,7 +600,11 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
                     onClick={() => void revoke(share)}
                     type="button"
                   >
-                    {busyId === share.id ? <Spinner className="size-3.5" /> : <TrashIcon className="size-3.5" />}
+                    {busyId === share.id ? (
+                      <Spinner className="size-3.5" />
+                    ) : (
+                      <TrashIcon className="size-3.5" />
+                    )}
                     Revoke
                   </button>
                 </div>

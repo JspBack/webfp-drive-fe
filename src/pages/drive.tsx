@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useRef, useState, Fragment, type DragEvent } from 'react';
+import {
+  type DragEvent,
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { ConfirmDialog, NewFolderDialog, ShareDialog, SharesDialog } from '../components/dialogs';
-import { KebabMenu } from '../components/KebabMenu';
+import {
+  ConfirmDialog,
+  NewFolderDialog,
+  ShareDialog,
+  SharesDialog,
+} from '../components/dialogs';
 import {
   ChevronRightIcon,
   DownloadIcon,
@@ -14,8 +25,13 @@ import {
   TrashIcon,
   UploadIcon,
 } from '../components/icons';
+import { KebabMenu } from '../components/KebabMenu';
 import { apiRequest, clearAPISession } from '../lib/api';
 import {
+  DRAG_MIME,
+  type DragPayload,
+  type DriveFile,
+  type DriveFolder,
   deleteFile,
   deleteFolder,
   downloadFile,
@@ -27,13 +43,9 @@ import {
   moveFile,
   moveFolder,
   parseDragPayload,
+  type StorageUsage,
   uploadFiles,
   walkCrumbs,
-  DRAG_MIME,
-  type DragPayload,
-  type DriveFile,
-  type DriveFolder,
-  type StorageUsage,
 } from '../lib/drive';
 import { formatBytes, formatDate } from '../lib/format';
 
@@ -96,7 +108,11 @@ export function Drive() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([listFolders(folderId), listFiles(folderId), getStorageUsage()])
+    void Promise.all([
+      listFolders(folderId),
+      listFiles(folderId),
+      getStorageUsage(),
+    ])
       .then(([folderList, fileList, storageUsage]) => {
         if (cancelled) return;
         setFolders(folderList);
@@ -121,7 +137,9 @@ export function Drive() {
     void walkCrumbs(folderId)
       .then((chain) => {
         if (cancelled) return;
-        setCrumbs((previous) => (previous[folderId] ? previous : { ...previous, [folderId]: chain }));
+        setCrumbs((previous) =>
+          previous[folderId] ? previous : { ...previous, [folderId]: chain },
+        );
       })
       .catch(() => {
         // breadcrumb names are best effort; navigation still works
@@ -169,7 +187,8 @@ export function Drive() {
         if (current && (current.folder_id ?? null) === destination) return;
       }
       try {
-        if (payload.kind === 'folder') await moveFolder(payload.id, destination);
+        if (payload.kind === 'folder')
+          await moveFolder(payload.id, destination);
         else await moveFile(payload.id, destination);
         setError('');
         refresh();
@@ -189,7 +208,8 @@ export function Drive() {
         setHover(key);
       },
       onDragLeave: (event: DragEvent) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (event.currentTarget.contains(event.relatedTarget as Node | null))
+          return;
         event.stopPropagation();
         setHover((value) => (value === key ? null : value));
       },
@@ -220,7 +240,10 @@ export function Drive() {
         draggable: true,
         onDragStart: (event: DragEvent) => {
           event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'folder', id: folder.id }));
+          event.dataTransfer.setData(
+            DRAG_MIME,
+            JSON.stringify({ kind: 'folder', id: folder.id }),
+          );
           event.dataTransfer.setData('text/plain', folder.name);
         },
       },
@@ -232,7 +255,10 @@ export function Drive() {
       draggable: true,
       onDragStart: (event: DragEvent) => {
         event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'file', id: file.id }));
+        event.dataTransfer.setData(
+          DRAG_MIME,
+          JSON.stringify({ kind: 'file', id: file.id }),
+        );
         event.dataTransfer.setData('text/plain', file.filename);
       },
     };
@@ -256,10 +282,16 @@ export function Drive() {
 
   const chain = folderId ? (crumbs[folderId] ?? []) : [];
   const currentName =
-    chain.length > 0 ? chain[chain.length - 1].name : folderId ? 'Folder' : 'Home';
+    chain.length > 0
+      ? chain[chain.length - 1].name
+      : folderId
+        ? 'Folder'
+        : 'Home';
   const isEmpty = folders.length === 0 && files.length === 0;
   const storageFull =
-    usage !== null && usage.limit_bytes > 0 && usage.used_bytes >= usage.limit_bytes;
+    usage !== null &&
+    usage.limit_bytes > 0 &&
+    usage.used_bytes >= usage.limit_bytes;
   const usagePercent =
     usage && usage.limit_bytes > 0
       ? Math.min(100, Math.round((usage.used_bytes / usage.limit_bytes) * 100))
@@ -271,17 +303,29 @@ export function Drive() {
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
           <Link className="inline-flex items-center gap-3" to="/">
             <span className="grid size-10 place-items-center rounded-xl bg-blue-700 text-white shadow-lg shadow-blue-900/15">
-              <svg aria-hidden="true" className="size-5" fill="none" viewBox="0 0 24 24">
+              <svg
+                aria-hidden="true"
+                className="size-5"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
                 <path
                   d="m8.5 3.75-6 10.5 3.75 6.5h12l3.25-5.75-6.5-11.25h-6.5Z"
                   stroke="currentColor"
                   strokeLinejoin="round"
                   strokeWidth="1.8"
                 />
-                <path d="m2.5 14.25 12.5-.5m-6.5-10 6.5 11.25" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+                <path
+                  d="m2.5 14.25 12.5-.5m-6.5-10 6.5 11.25"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="1.8"
+                />
               </svg>
             </span>
-            <span className="text-base font-semibold tracking-tight">WebFP Drive</span>
+            <span className="text-base font-semibold tracking-tight">
+              WebFP Drive
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden max-w-[14rem] truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-block">
@@ -292,7 +336,12 @@ export function Drive() {
               onClick={() => void signOut()}
               type="button"
             >
-              <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 20 20">
+              <svg
+                aria-hidden="true"
+                className="size-4"
+                fill="none"
+                viewBox="0 0 20 20"
+              >
                 <path
                   d="M8.333 5.833V4.167A1.667 1.667 0 0 1 10 2.5h5.833A1.667 1.667 0 0 1 17.5 4.167v11.666a1.667 1.667 0 0 1-1.667 1.667H10a1.667 1.667 0 0 1-1.667-1.667v-1.666M12.5 10H2.5m0 0 3.333-3.333M2.5 10l3.333 3.333"
                   stroke="currentColor"
@@ -309,10 +358,15 @@ export function Drive() {
 
       <section className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <nav aria-label="Folder path" className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
+          <nav
+            aria-label="Folder path"
+            className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm"
+          >
             <Link
               className={`rounded-lg px-2 py-1 font-semibold transition ${
-                'home-crumb' === hover ? 'bg-blue-50 text-blue-700 ring-2 ring-blue-500' : 'text-slate-700 hover:bg-slate-100'
+                'home-crumb' === hover
+                  ? 'bg-blue-50 text-blue-700 ring-2 ring-blue-500'
+                  : 'text-slate-700 hover:bg-slate-100'
               }`}
               to="/"
               {...rootZone}
@@ -369,14 +423,21 @@ export function Drive() {
           </div>
         </div>
 
-        <h1 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl">{currentName}</h1>
+        <h1 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl">
+          {currentName}
+        </h1>
 
         {usage && (
           <div className="mt-4" data-testid="storage-usage">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500">
               <span data-testid="storage-usage-text">
-                {formatBytes(usage.used_bytes)} of {formatBytes(usage.limit_bytes)} used
-                {storageFull && <span className="ml-2 font-semibold text-red-600">Storage full</span>}
+                {formatBytes(usage.used_bytes)} of{' '}
+                {formatBytes(usage.limit_bytes)} used
+                {storageFull && (
+                  <span className="ml-2 font-semibold text-red-600">
+                    Storage full
+                  </span>
+                )}
               </span>
               <span>
                 {usage.file_count} {usage.file_count === 1 ? 'file' : 'files'}
@@ -420,23 +481,31 @@ export function Drive() {
           role="button"
           tabIndex={0}
           onKeyDown={(event) => {
-            if ((event.key === 'Enter' || event.key === ' ') && !storageFull) inputRef.current?.click();
+            if ((event.key === 'Enter' || event.key === ' ') && !storageFull)
+              inputRef.current?.click();
           }}
           {...uploadZone}
         >
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700">
             <UploadIcon className="size-6" />
           </span>
-          <p className="mt-4 text-sm font-semibold text-slate-900">Drag and drop files here</p>
+          <p className="mt-4 text-sm font-semibold text-slate-900">
+            Drag and drop files here
+          </p>
           {storageFull ? (
             <p className="mt-1 text-sm font-medium text-red-600">
               Storage is full — delete files to upload more.
             </p>
           ) : (
             <p className="mt-1 text-sm text-slate-500">
-              or <span className="font-semibold text-blue-700">browse your device</span>
+              or{' '}
+              <span className="font-semibold text-blue-700">
+                browse your device
+              </span>
               {' — uploads go into '}
-              <span className="font-semibold text-slate-700">{currentName}</span>
+              <span className="font-semibold text-slate-700">
+                {currentName}
+              </span>
             </p>
           )}
           {uploading > 0 && (
@@ -452,7 +521,8 @@ export function Drive() {
           multiple
           onChange={(event) => {
             const chosen = event.target.files;
-            if (chosen && chosen.length > 0) void handleUpload(chosen, folderId ?? null);
+            if (chosen && chosen.length > 0)
+              void handleUpload(chosen, folderId ?? null);
             event.target.value = '';
           }}
           ref={inputRef}
@@ -461,7 +531,9 @@ export function Drive() {
 
         <div
           className={`mt-6 rounded-3xl border p-5 transition sm:p-6 ${
-            hover === 'grid' ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 bg-white'
+            hover === 'grid'
+              ? 'border-blue-500 bg-blue-50/60'
+              : 'border-slate-200 bg-white'
           }`}
           {...gridZone}
         >
@@ -475,9 +547,12 @@ export function Drive() {
                 <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-slate-100 text-slate-500">
                   <FolderIcon className="size-6" />
                 </span>
-                <p className="mt-4 text-sm font-semibold text-slate-900">This folder is empty</p>
+                <p className="mt-4 text-sm font-semibold text-slate-900">
+                  This folder is empty
+                </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Drop files here, create a folder, or drag an item in from somewhere else.
+                  Drop files here, create a folder, or drag an item in from
+                  somewhere else.
                 </p>
               </div>
             </div>
@@ -508,15 +583,26 @@ export function Drive() {
                             danger: true,
                             icon: <TrashIcon className="size-4" />,
                             onSelect: () =>
-                              setDeleteTarget({ kind: 'folder', id: folder.id, name: folder.name }),
+                              setDeleteTarget({
+                                kind: 'folder',
+                                id: folder.id,
+                                name: folder.name,
+                              }),
                           },
                         ]}
                         label={`Actions for folder ${folder.name}`}
                       />
                     </div>
-                    <Link className="mt-3 block rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20" to={`/f/${folder.id}`}>
-                      <p className="truncate text-sm font-semibold text-slate-900">{folder.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">Folder · {formatDate(folder.created_at)}</p>
+                    <Link
+                      className="mt-3 block rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
+                      to={`/f/${folder.id}`}
+                    >
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {folder.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Folder · {formatDate(folder.created_at)}
+                      </p>
                     </Link>
                   </div>
                 );
@@ -544,7 +630,11 @@ export function Drive() {
                           danger: true,
                           icon: <TrashIcon className="size-4" />,
                           onSelect: () =>
-                            setDeleteTarget({ kind: 'file', id: file.id, name: file.filename }),
+                            setDeleteTarget({
+                              kind: 'file',
+                              id: file.id,
+                              name: file.filename,
+                            }),
                         },
                       ]}
                       label={`Actions for file ${file.filename}`}
@@ -564,7 +654,8 @@ export function Drive() {
                       {file.filename}
                     </span>
                     <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                      {formatBytes(file.size_bytes)} · {formatDate(file.created_at)}
+                      {formatBytes(file.size_bytes)} ·{' '}
+                      {formatDate(file.created_at)}
                       {file.status !== 'ready' && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                           {file.status}
@@ -589,7 +680,9 @@ export function Drive() {
           onCreated={refresh}
         />
       )}
-      {shareFile && <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />}
+      {shareFile && (
+        <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />
+      )}
       {sharesOpen && <SharesDialog onClose={() => setSharesOpen(false)} />}
       {deleteTarget && (
         <ConfirmDialog

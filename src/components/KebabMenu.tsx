@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { MoreIcon } from './icons';
 
@@ -9,7 +9,13 @@ export type MenuAction = {
   onSelect: () => void;
 };
 
-export function KebabMenu({ actions, label }: { actions: MenuAction[]; label: string }) {
+export function KebabMenu({
+  actions,
+  label,
+}: {
+  actions: MenuAction[];
+  label: string;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
