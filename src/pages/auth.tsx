@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { register, signIn, startGitHubLogin, startGoogleLogin } from '../lib/api';
+import {
+  register,
+  signIn,
+  startGitHubLogin,
+  startGoogleLogin,
+  VerificationRequiredError,
+} from '../lib/api';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
@@ -19,12 +25,23 @@ export function Auth() {
     setError('');
     try {
       if (mode === 'sign-up') {
-        await register(name.trim(), email, password);
-      } else {
-        await signIn(email, password);
+        const challenge = await register(name.trim(), email, password);
+        navigate('/auth/verify', {
+          state: {
+            email: challenge.email,
+            message: challenge.message,
+            expiresInMinutes: challenge.expires_in_minutes,
+          },
+        });
+        return;
       }
+      await signIn(email, password);
       navigate('/', { replace: true });
     } catch (cause) {
+      if (cause instanceof VerificationRequiredError) {
+        navigate('/auth/verify', { state: { email: cause.email } });
+        return;
+      }
       setError(cause instanceof Error ? cause.message : 'Unable to sign in.');
     } finally {
       setBusy(false);
