@@ -22,5 +22,6 @@ image:
 deploy-gke:
 	kubectl apply -f deploy/ns.yaml
 	kubectl apply -f deploy/ -f deploy/gke/
-	kubectl -n webfp rollout restart statefulset/webfp-fe
-	kubectl -n webfp rollout status statefulset/webfp-fe --timeout=300s
+	kubectl -n webfp rollout restart deployment/webfp-fe
+	kubectl -n webfp rollout status deployment/webfp-fe --timeout=300s
+	kubectl -n webfp delete statefulset/webfp-fe --ignore-not-found

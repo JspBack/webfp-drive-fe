@@ -1,15 +1,16 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: webfp-fe
   namespace: webfp
   labels:
     app: webfp-fe
 spec:
-  serviceName: webfp-fe
-  replicas: 2
-  updateStrategy:
+  strategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   minReadySeconds: 30
   selector:
     matchLabels:

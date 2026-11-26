@@ -5,3 +5,7 @@ metadata:
   namespace: webfp
 spec:
   timeoutSec: 300
+  healthCheck:
+    type: HTTP
+    requestPath: /healthz
+    port: 8080
