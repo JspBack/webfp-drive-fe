@@ -25,3 +25,6 @@ deploy/
 makefile
 Dockerfile
 .dockerignore
+
+# Test reports
+coverage/
