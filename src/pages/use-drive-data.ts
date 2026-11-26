@@ -88,6 +88,7 @@ export function useDriveData(folderId: string | undefined) {
         );
       })
       .catch(() => {
+        // Folder navigation still works without breadcrumb names.
       });
     return () => {
       cancelled = true;
