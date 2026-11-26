@@ -1,3 +1,5 @@
+import { beginOAuth } from './oauth-state';
+
 const apiBaseURL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 type AuthSession = {
@@ -123,11 +125,11 @@ export function saveSession(token: string, refreshToken: string) {
 }
 
 export function startGitHubLogin() {
-  window.location.assign(`${apiBaseURL}/api/v1/auth/github`);
+  beginOAuth(`${apiBaseURL}/api/v1/auth/github`);
 }
 
 export function startGoogleLogin() {
-  window.location.assign(`${apiBaseURL}/api/v1/auth/google`);
+  beginOAuth(`${apiBaseURL}/api/v1/auth/google`);
 }
 
 export async function apiRequest(path: string, init: RequestInit = {}) {

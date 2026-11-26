@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { saveSession } from '../lib/api';
+import { consumeOAuthSession } from '../lib/oauth-state';
 
 type Outcome = { signedIn: true } | { signedIn: false; message: string };
 
@@ -8,27 +9,33 @@ function readCallback(): Outcome {
   const params = new URLSearchParams(window.location.hash.slice(1));
   window.history.replaceState(null, '', window.location.pathname);
 
-  const token = params.get('token');
-  const refreshToken = params.get('refresh_token');
-  if (token && refreshToken) {
-    saveSession(token, refreshToken);
+  const session = consumeOAuthSession(params);
+  if (session) {
+    saveSession(session.token, session.refreshToken);
     return { signedIn: true };
   }
   return {
     signedIn: false,
-    message: params.get('error') ?? 'GitHub sign-in did not return a session.',
+    message:
+      params.get('error') ??
+      'Sign-in could not be verified. Start again from the sign-in page.',
   };
 }
 
 export function AuthCallback() {
-  const [outcome] = useState(readCallback);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const handled = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (outcome.signedIn) navigate('/', { replace: true });
-  }, [navigate, outcome]);
+    if (handled.current) return;
+    handled.current = true;
+    const result = readCallback();
+    setOutcome(result);
+    if (result.signedIn) navigate('/', { replace: true });
+  }, [navigate]);
 
-  const error = outcome.signedIn ? '' : outcome.message;
+  const error = outcome && !outcome.signedIn ? outcome.message : '';
 
   return (
     <main className="grid min-h-screen place-items-center bg-slate-50 px-5 py-12 text-slate-900">
