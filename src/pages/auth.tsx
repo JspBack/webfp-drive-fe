@@ -107,16 +107,8 @@ export function Auth() {
       </aside>
 
       <section className="flex min-h-screen flex-col px-6 py-7 sm:px-10 lg:px-12 xl:px-20">
-        <div className="flex items-center justify-between">
-          <div className="lg:hidden">
-            <Brand />
-          </div>
-          <Link
-            className="ml-auto text-sm font-medium text-slate-500 transition hover:text-slate-900"
-            to="/"
-          >
-            Back to home
-          </Link>
+        <div className="lg:hidden">
+          <Brand />
         </div>
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
