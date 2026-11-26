@@ -1,6 +1,6 @@
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@11 --activate
+RUN npm install --global pnpm@12.23.0
 
 WORKDIR /app
 

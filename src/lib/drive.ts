@@ -167,6 +167,31 @@ export async function deleteFile(id: string): Promise<void> {
   );
 }
 
+export async function importFolder(
+  files: File[],
+  parentId: string | null,
+): Promise<void> {
+  if (files.some((file) => !file.webkitRelativePath.includes('/'))) {
+    throw new Error('Your browser did not provide the selected folder paths.');
+  }
+  const folders = new Map<string, string>();
+  for (const file of files) {
+    const parts = file.webkitRelativePath.split('/').slice(0, -1);
+    let destination = parentId;
+    let path = '';
+    for (const name of parts) {
+      path += `/${name}`;
+      let id = folders.get(path);
+      if (!id) {
+        id = (await createFolder(name, destination)).id;
+        folders.set(path, id);
+      }
+      destination = id;
+    }
+    await uploadFiles([file], destination);
+  }
+}
+
 export async function uploadFiles(
   files: File[],
   folderId: string | null,

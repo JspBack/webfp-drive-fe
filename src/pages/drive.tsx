@@ -36,6 +36,7 @@ import {
   deleteFolder,
   downloadFile,
   getStorageUsage,
+  importFolder,
   isFileDrag,
   isItemDrag,
   listFiles,
@@ -64,6 +65,38 @@ function messageOf(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
 }
 
+function fileIconColor(file: DriveFile): string {
+  const mime = file.content_type.toLowerCase();
+  const extension = file.filename.split('.').pop()?.toLowerCase() ?? '';
+  if (mime === 'application/pdf' || extension === 'pdf')
+    return 'bg-red-50 text-red-700';
+  if (
+    mime.startsWith('image/') ||
+    /^(png|jpe?g|gif|svg|webp|heic|avif)$/.test(extension)
+  )
+    return 'bg-fuchsia-50 text-fuchsia-700';
+  if (mime.startsWith('video/') || /^(mp4|mov|webm|mkv)$/.test(extension))
+    return 'bg-indigo-50 text-indigo-700';
+  if (mime.startsWith('audio/') || /^(mp3|wav|flac|m4a|ogg)$/.test(extension))
+    return 'bg-teal-50 text-teal-700';
+  if (/^(zip|7z|rar|gz|tar|bz2)$/.test(extension))
+    return 'bg-amber-50 text-amber-700';
+  if (
+    /spreadsheet|excel|\/csv/.test(mime) ||
+    /^(xls[xm]?|ods|csv|tsv)$/.test(extension)
+  )
+    return 'bg-emerald-50 text-emerald-700';
+  if (/presentation|powerpoint/.test(mime) || /^(pptx?|odp)$/.test(extension))
+    return 'bg-orange-50 text-orange-700';
+  if (
+    mime.startsWith('text/') ||
+    /wordprocessing|msword/.test(mime) ||
+    /^(docx?|odt|rtf|txt|md)$/.test(extension)
+  )
+    return 'bg-sky-50 text-sky-700';
+  return 'bg-slate-100 text-slate-600';
+}
+
 export function Drive() {
   const { folderId } = useParams<{ folderId?: string }>();
   const navigate = useNavigate();
@@ -82,6 +115,10 @@ export function Drive() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [usage, setUsage] = useState<StorageUsage | null>(null);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const uploadInProgress = useRef(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => setReloadKey((key) => key + 1), []);
@@ -106,6 +143,7 @@ export function Drive() {
       });
   }, [navigate]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey explicitly refreshes the active folder after drive mutations.
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
@@ -118,7 +156,6 @@ export function Drive() {
         setFolders(folderList);
         setFiles(fileList);
         setUsage(storageUsage);
-        setError('');
         setLoading(false);
       })
       .catch((cause: unknown) => {
@@ -149,10 +186,21 @@ export function Drive() {
     };
   }, [folderId, crumbs]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the selection when navigating to another folder.
+  useEffect(() => {
+    setSelection(new Set());
+    setBulkDeleteOpen(false);
+    setError('');
+  }, [folderId]);
+
   const handleUpload = useCallback(
-    async (chosen: FileList | File[], destination: string | null) => {
+    async (
+      chosen: FileList | File[],
+      destination: string | null,
+      asFolder = false,
+    ) => {
       const uploads = Array.from(chosen);
-      if (uploads.length === 0) return;
+      if (uploads.length === 0 || uploadInProgress.current) return;
       if (usage) {
         const incoming = uploads.reduce((total, file) => total + file.size, 0);
         if (usage.used_bytes + incoming > usage.limit_bytes) {
@@ -164,15 +212,18 @@ export function Drive() {
           return;
         }
       }
+      uploadInProgress.current = true;
       setUploading(uploads.length);
       try {
-        await uploadFiles(uploads, destination);
+        if (asFolder) await importFolder(uploads, destination);
+        else await uploadFiles(uploads, destination);
         setError('');
-        refresh();
       } catch (cause) {
         setError(messageOf(cause, 'Upload failed.'));
       } finally {
+        uploadInProgress.current = false;
         setUploading(0);
+        refresh();
       }
     },
     [refresh, usage],
@@ -280,6 +331,60 @@ export function Drive() {
     refresh();
   }
 
+  const items: DeleteTarget[] = [
+    ...folders.map(({ id, name }) => ({ kind: 'folder' as const, id, name })),
+    ...files.map(({ id, filename }) => ({
+      kind: 'file' as const,
+      id,
+      name: filename,
+    })),
+  ];
+  const selectedItems = items.filter((item) =>
+    selection.has(selectionKey(item)),
+  );
+
+  function selectionKey(item: Pick<DeleteTarget, 'kind' | 'id'>) {
+    return `${item.kind}:${item.id}`;
+  }
+
+  function selectionBox(kind: DeleteTarget['kind'], id: string, name: string) {
+    const key = selectionKey({ kind, id });
+    return (
+      <input
+        aria-label={`Select ${kind} ${name}`}
+        checked={selection.has(key)}
+        className="size-5 shrink-0 accent-blue-700"
+        onChange={(event) => {
+          const checked = event.currentTarget.checked;
+          setSelection((previous) => {
+            const next = new Set(previous);
+            if (checked) next.add(key);
+            else next.delete(key);
+            return next;
+          });
+        }}
+        type="checkbox"
+      />
+    );
+  }
+
+  async function confirmBulkDelete() {
+    const failed = new Set<string>();
+    const errors: string[] = [];
+    for (const item of selectedItems) {
+      try {
+        if (item.kind === 'file') await deleteFile(item.id);
+        else await deleteFolder(item.id);
+      } catch (cause) {
+        failed.add(selectionKey(item));
+        errors.push(`${item.name}: ${messageOf(cause, 'Delete failed.')}`);
+      }
+    }
+    setSelection(failed);
+    refresh();
+    if (errors.length) throw new Error(errors.join(' • '));
+  }
+
   const chain = folderId ? (crumbs[folderId] ?? []) : [];
   const currentName =
     chain.length > 0
@@ -300,7 +405,7 @@ export function Drive() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200/80 bg-white">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
+        <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
           <Link className="inline-flex items-center gap-3" to="/">
             <span className="grid size-10 place-items-center rounded-xl bg-blue-700 text-white shadow-lg shadow-blue-900/15">
               <svg
@@ -328,7 +433,7 @@ export function Drive() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            <span className="hidden max-w-[14rem] truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-block">
+            <span className="hidden max-w-56 truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-block">
               {user?.email || '…'}
             </span>
             <button
@@ -387,13 +492,13 @@ export function Drive() {
             {chain.length > 0 && (
               <>
                 <ChevronRightIcon className="size-4 text-slate-400" />
-                <span className="max-w-[16rem] truncate rounded-lg bg-slate-100 px-2 py-1 font-semibold text-slate-900">
+                <span className="max-w-64 truncate rounded-lg bg-slate-100 px-2 py-1 font-semibold text-slate-900">
                   {currentName}
                 </span>
               </>
             )}
           </nav>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
               onClick={() => setSharesOpen(true)}
@@ -411,8 +516,17 @@ export function Drive() {
               New folder
             </button>
             <button
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              disabled={storageFull || uploading > 0}
+              onClick={() => folderInputRef.current?.click()}
+              type="button"
+            >
+              <FolderIcon className="size-4" />
+              Import folder
+            </button>
+            <button
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={storageFull}
+              disabled={storageFull || uploading > 0}
               onClick={() => inputRef.current?.click()}
               title={storageFull ? 'Storage is full' : undefined}
               type="button"
@@ -469,35 +583,31 @@ export function Drive() {
           </div>
         )}
 
-        <div
-          className={`mt-5 rounded-3xl border-2 border-dashed p-7 text-center transition sm:p-9 ${
+        <button
+          className={`mt-5 w-full rounded-3xl border-2 border-dashed p-7 text-center transition sm:p-9 ${
             hover === 'upload'
               ? 'border-blue-500 bg-blue-50'
               : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40'
           }`}
+          aria-disabled={storageFull || uploading > 0}
           onClick={() => {
-            if (!storageFull) inputRef.current?.click();
+            if (!storageFull && uploading === 0) inputRef.current?.click();
           }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if ((event.key === 'Enter' || event.key === ' ') && !storageFull)
-              inputRef.current?.click();
-          }}
+          type="button"
           {...uploadZone}
         >
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-700">
             <UploadIcon className="size-6" />
           </span>
-          <p className="mt-4 text-sm font-semibold text-slate-900">
+          <span className="mt-4 block text-sm font-semibold text-slate-900">
             Drag and drop files here
-          </p>
+          </span>
           {storageFull ? (
-            <p className="mt-1 text-sm font-medium text-red-600">
+            <span className="mt-1 block text-sm font-medium text-red-600">
               Storage is full — delete files to upload more.
-            </p>
+            </span>
           ) : (
-            <p className="mt-1 text-sm text-slate-500">
+            <span className="mt-1 block text-sm text-slate-500">
               or{' '}
               <span className="font-semibold text-blue-700">
                 browse your device
@@ -506,15 +616,15 @@ export function Drive() {
               <span className="font-semibold text-slate-700">
                 {currentName}
               </span>
-            </p>
+            </span>
           )}
           {uploading > 0 && (
-            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white">
+            <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white">
               <Spinner className="size-3.5" />
               Uploading {uploading} {uploading === 1 ? 'file' : 'files'}…
-            </p>
+            </span>
           )}
-        </div>
+        </button>
 
         <input
           className="hidden"
@@ -528,6 +638,57 @@ export function Drive() {
           ref={inputRef}
           type="file"
         />
+
+        <input
+          className="hidden"
+          multiple
+          onChange={(event) => {
+            if (event.currentTarget.files)
+              void handleUpload(
+                event.currentTarget.files,
+                folderId ?? null,
+                true,
+              );
+            event.currentTarget.value = '';
+          }}
+          ref={(input) => {
+            folderInputRef.current = input;
+            input?.setAttribute('webkitdirectory', '');
+          }}
+          type="file"
+        />
+
+        {!loading && items.length > 0 && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                checked={selectedItems.length === items.length}
+                className="size-5 accent-blue-700"
+                onChange={(event) =>
+                  setSelection(
+                    new Set(
+                      event.currentTarget.checked
+                        ? items.map(selectionKey)
+                        : [],
+                    ),
+                  )
+                }
+                type="checkbox"
+              />
+              Select all
+            </label>
+            {selectedItems.length > 0 && (
+              <button
+                className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                onClick={() => setBulkDeleteOpen(true)}
+                type="button"
+              >
+                <TrashIcon className="size-4" />
+                Delete selected ({selectedItems.length})
+              </button>
+            )}
+          </div>
+        )}
 
         <div
           className={`mt-6 rounded-3xl border p-5 transition sm:p-6 ${
@@ -576,22 +737,25 @@ export function Drive() {
                       <span className="grid size-11 place-items-center rounded-xl bg-blue-50 text-blue-700">
                         <FolderIcon className="size-5.5" />
                       </span>
-                      <KebabMenu
-                        actions={[
-                          {
-                            label: 'Delete',
-                            danger: true,
-                            icon: <TrashIcon className="size-4" />,
-                            onSelect: () =>
-                              setDeleteTarget({
-                                kind: 'folder',
-                                id: folder.id,
-                                name: folder.name,
-                              }),
-                          },
-                        ]}
-                        label={`Actions for folder ${folder.name}`}
-                      />
+                      <div className="flex items-center gap-2">
+                        {selectionBox('folder', folder.id, folder.name)}
+                        <KebabMenu
+                          actions={[
+                            {
+                              label: 'Delete',
+                              danger: true,
+                              icon: <TrashIcon className="size-4" />,
+                              onSelect: () =>
+                                setDeleteTarget({
+                                  kind: 'folder',
+                                  id: folder.id,
+                                  name: folder.name,
+                                }),
+                            },
+                          ]}
+                          label={`Actions for folder ${folder.name}`}
+                        />
+                      </div>
                     </div>
                     <Link
                       className="mt-3 block rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
@@ -615,30 +779,35 @@ export function Drive() {
                   {...fileTileProps(file)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="grid size-11 place-items-center rounded-xl bg-violet-50 text-violet-700">
+                    <span
+                      className={`grid size-11 place-items-center rounded-xl ${fileIconColor(file)}`}
+                    >
                       <FileIcon className="size-5.5" />
                     </span>
-                    <KebabMenu
-                      actions={[
-                        {
-                          label: 'Share',
-                          icon: <ShareIcon className="size-4" />,
-                          onSelect: () => setShareFile(file),
-                        },
-                        {
-                          label: 'Delete',
-                          danger: true,
-                          icon: <TrashIcon className="size-4" />,
-                          onSelect: () =>
-                            setDeleteTarget({
-                              kind: 'file',
-                              id: file.id,
-                              name: file.filename,
-                            }),
-                        },
-                      ]}
-                      label={`Actions for file ${file.filename}`}
-                    />
+                    <div className="flex items-center gap-2">
+                      {selectionBox('file', file.id, file.filename)}
+                      <KebabMenu
+                        actions={[
+                          {
+                            label: 'Share',
+                            icon: <ShareIcon className="size-4" />,
+                            onSelect: () => setShareFile(file),
+                          },
+                          {
+                            label: 'Delete',
+                            danger: true,
+                            icon: <TrashIcon className="size-4" />,
+                            onSelect: () =>
+                              setDeleteTarget({
+                                kind: 'file',
+                                id: file.id,
+                                name: file.filename,
+                              }),
+                          },
+                        ]}
+                        label={`Actions for file ${file.filename}`}
+                      />
+                    </div>
                   </div>
                   <button
                     className="mt-3 block w-full rounded-lg text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
@@ -684,6 +853,16 @@ export function Drive() {
         <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />
       )}
       {sharesOpen && <SharesDialog onClose={() => setSharesOpen(false)} />}
+      {bulkDeleteOpen && (
+        <ConfirmDialog
+          confirmLabel="Delete selected"
+          message={`Permanently delete ${selectedItems.length} selected items? Folders must be empty. This cannot be undone.`}
+          onClose={() => setBulkDeleteOpen(false)}
+          onConfirm={confirmBulkDelete}
+          title="Delete selected items"
+        />
+      )}
+
       {deleteTarget && (
         <ConfirmDialog
           confirmLabel="Delete"

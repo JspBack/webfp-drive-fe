@@ -52,7 +52,7 @@ export function Auth() {
     <main className="min-h-screen bg-white text-slate-900 lg:grid lg:grid-cols-2">
       <aside className="relative hidden min-h-screen overflow-hidden bg-slate-950 px-12 py-10 text-white lg:flex lg:flex-col xl:px-20">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_18%_12%,rgba(59,130,246,0.35),transparent_38%),radial-gradient(ellipse_at_85%_80%,rgba(14,165,233,0.2),transparent_34%)]" />
-        <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
+        <div className="absolute inset-0 opacity-14 bg-[linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] bg-size-[64px_64px] mask-[linear-gradient(to_bottom,black,transparent_78%)]" />
         <div className="relative flex h-full flex-col">
           <Brand light />
           <div className="my-auto max-w-xl py-20">
@@ -283,7 +283,7 @@ function FileTile({ label, color }: { label: string; color: string }) {
 
 function GoogleMark() {
   return (
-    <svg aria-hidden="true" className="size-[18px]" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className="size-4.5" viewBox="0 0 24 24">
       <path
         fill="#4285F4"
         d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"
@@ -308,7 +308,7 @@ function GitHubMark() {
   return (
     <svg
       aria-hidden="true"
-      className="size-[18px]"
+      className="size-4.5"
       fill="currentColor"
       viewBox="0 0 24 24"
     >
