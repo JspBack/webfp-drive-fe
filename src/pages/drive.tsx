@@ -13,6 +13,8 @@ import { DriveUpload } from './drive-upload';
 import { useDriveData } from './use-drive-data';
 import { useDriveTransfers } from './use-drive-transfers';
 
+const storagePlanLabels = { free: 'Free', pro: 'Pro', admin: 'Admin' } as const;
+
 export function Drive() {
   const { folderId } = useParams<{ folderId?: string }>();
   const {
@@ -148,8 +150,11 @@ export function Drive() {
           <div className="mt-4" data-testid="storage-usage">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500">
               <span data-testid="storage-usage-text">
-                {formatBytes(usage.used_bytes)} of{' '}
-                {formatBytes(usage.limit_bytes)} used
+                {storagePlanLabels[usage.plan]} plan ·{' '}
+                {formatBytes(usage.used_bytes)}
+                {usage.limit_bytes > 0
+                  ? ` of ${formatBytes(usage.limit_bytes)} used`
+                  : ' used (unlimited)'}
                 {storageFull && (
                   <span className="ml-2 font-semibold text-red-600">
                     Storage full
@@ -160,12 +165,14 @@ export function Drive() {
                 {usage.file_count} {usage.file_count === 1 ? 'file' : 'files'}
               </span>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className={`h-full rounded-full transition-all ${storageFull ? 'bg-red-500' : 'bg-blue-600'}`}
-                style={{ width: `${usagePercent}%` }}
-              />
-            </div>
+            {usage.limit_bytes > 0 && (
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full rounded-full transition-all ${storageFull ? 'bg-red-500' : 'bg-blue-600'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
 

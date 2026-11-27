@@ -42,6 +42,7 @@ export type ShareListItem = {
 };
 
 export type StorageUsage = {
+  plan: 'free' | 'pro' | 'admin';
   used_bytes: number;
   limit_bytes: number;
   file_count: number;

@@ -35,7 +35,7 @@ export function useDriveTransfers(
     ) => {
       const uploads = Array.from(chosen);
       if (uploads.length === 0 || uploadInProgress.current) return;
-      if (usage) {
+      if (usage && usage.limit_bytes > 0) {
         const incoming = uploads.reduce((total, file) => total + file.size, 0);
         if (usage.used_bytes + incoming > usage.limit_bytes) {
           setError(

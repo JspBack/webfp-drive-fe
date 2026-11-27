@@ -22,9 +22,11 @@ const request = vi.mocked(apiRequest);
 
 function mockDrive({
   full = false,
+  plan = 'free',
   folderDeleteFails = false,
 }: {
   full?: boolean;
+  plan?: 'free' | 'pro' | 'admin';
   folderDeleteFails?: boolean;
 } = {}) {
   let hasFolder = true;
@@ -40,6 +42,10 @@ function mockDrive({
           ? [{ id: 'folder-1', name: 'Reports', created_at: '2026-01-01' }]
           : [],
       );
+    }
+
+    if (path === '/api/v1/files' && options?.method === 'POST') {
+      return new Response(null, { status: 201 });
     }
 
     if (path === '/api/v1/files') {
@@ -61,8 +67,9 @@ function mockDrive({
 
     if (path === '/api/v1/users/me/usage') {
       return Response.json({
+        plan,
         used_bytes: full ? 1024 : 256,
-        limit_bytes: 1024,
+        limit_bytes: plan === 'admin' ? 0 : 1024,
         file_count: Number(hasFile),
       });
     }
@@ -182,5 +189,26 @@ describe('drive actions', () => {
         (screen.getByRole('button', { name }) as HTMLButtonElement).disabled,
       ).toBe(true);
     }
+  });
+
+  it('shows the unlimited Admin plan and lets the upload reach the API', async () => {
+    mockDrive({ plan: 'admin' });
+    const user = await openDrive();
+
+    expect(screen.getByTestId('storage-usage-text').textContent).toContain(
+      'Admin plan · 256 B used (unlimited)',
+    );
+    const input = document.querySelector<HTMLInputElement>(
+      'input[type="file"]:not([webkitdirectory])',
+    );
+    if (!input) throw new Error('File input is missing');
+    await user.upload(input, new File(['contents'], 'report.txt'));
+
+    await waitFor(() => {
+      expect(request).toHaveBeenCalledWith(
+        '/api/v1/files',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
   });
 });
