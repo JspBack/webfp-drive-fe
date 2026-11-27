@@ -1,21 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ConfirmDialog, NewFolderDialog } from '../components/dialogs';
+import { DriveToasts } from '../components/DriveToasts';
+import { NewFolderDialog } from '../components/dialogs';
+import { useDriveToast } from '../components/drive-toast-state';
 import { TrashIcon } from '../components/icons';
 import { ShareDialog } from '../components/ShareDialog';
 import { SharesDialog } from '../components/SharesDialog';
-import { type DriveFile, deleteFile, deleteFolder } from '../lib/drive';
+import type { ShareTarget } from '../lib/drive';
+import { deleteItems } from '../lib/drive-batches';
 import { messageOf } from '../lib/errors';
-import { formatBytes } from '../lib/format';
+import { deleteDriveSelection } from './drive-bulk-delete';
+import { DriveDeleteDialogs } from './drive-delete-dialogs';
 import { type DeleteTarget, DriveGrid } from './drive-grid';
 import { DriveHeader, DriveToolbar } from './drive-navigation';
+import { DriveStorageUsage } from './drive-storage-usage';
 import { DriveUpload } from './drive-upload';
+import { FolderImportDialog } from './folder-import-dialog';
 import { useDriveData } from './use-drive-data';
 import { useDriveTransfers } from './use-drive-transfers';
 
-const storagePlanLabels = { free: 'Free', pro: 'Pro', admin: 'Admin' } as const;
-
 export function Drive() {
+  return (
+    <DriveToasts>
+      <DriveScreen />
+    </DriveToasts>
+  );
+}
+
+function DriveScreen() {
+  const showToast = useDriveToast();
   const { folderId } = useParams<{ folderId?: string }>();
   const {
     user,
@@ -38,13 +51,12 @@ export function Drive() {
     setError,
   );
   const { hover, uploading, rootZone, uploadZone, handleUpload } = transfers;
-  const [shareFile, setShareFile] = useState<DriveFile | null>(null);
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
   const [sharesOpen, setSharesOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const folderInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the selection when navigating to another folder.
@@ -56,8 +68,23 @@ export function Drive() {
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    if (deleteTarget.kind === 'file') await deleteFile(deleteTarget.id);
-    else await deleteFolder(deleteTarget.id);
+    try {
+      await deleteItems([deleteTarget], ([result]) => {
+        if (result.error) throw new Error(result.error);
+      });
+    } catch (cause) {
+      showToast('delete', {
+        kind: 'error',
+        title: 'Delete failed',
+        message: messageOf(cause, 'Unable to delete the item.'),
+      });
+      throw cause;
+    }
+    showToast('delete', {
+      kind: 'success',
+      title: 'Item deleted',
+      message: deleteTarget.name,
+    });
     refresh();
   }
 
@@ -98,32 +125,10 @@ export function Drive() {
     );
   }
 
-  async function confirmBulkDelete() {
-    const failed = new Set<string>();
-    const errors: string[] = [];
-    for (const item of selectedItems) {
-      try {
-        if (item.kind === 'file') await deleteFile(item.id);
-        else await deleteFolder(item.id);
-      } catch (cause) {
-        failed.add(selectionKey(item));
-        errors.push(`${item.name}: ${messageOf(cause, 'Delete failed.')}`);
-      }
-    }
-    setSelection(failed);
-    refresh();
-    if (errors.length) throw new Error(errors.join(' • '));
-  }
-
   const storageFull =
     usage !== null &&
     usage.limit_bytes > 0 &&
     usage.used_bytes >= usage.limit_bytes;
-  const usagePercent =
-    usage && usage.limit_bytes > 0
-      ? Math.min(100, Math.round((usage.used_bytes / usage.limit_bytes) * 100))
-      : 0;
-
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <DriveHeader email={user?.email} signOut={signOut} />
@@ -138,7 +143,8 @@ export function Drive() {
           uploading={uploading}
           onShares={() => setSharesOpen(true)}
           onNewFolder={() => setNewFolderOpen(true)}
-          onImportFolder={() => folderInputRef.current?.click()}
+          onImportFolder={transfers.openFolderQueue}
+          onRefresh={refresh}
           onUpload={() => inputRef.current?.click()}
         />
 
@@ -146,35 +152,7 @@ export function Drive() {
           {currentName}
         </h1>
 
-        {usage && (
-          <div className="mt-4" data-testid="storage-usage">
-            <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-              <span data-testid="storage-usage-text">
-                {storagePlanLabels[usage.plan]} plan ·{' '}
-                {formatBytes(usage.used_bytes)}
-                {usage.limit_bytes > 0
-                  ? ` of ${formatBytes(usage.limit_bytes)} used`
-                  : ' used (unlimited)'}
-                {storageFull && (
-                  <span className="ml-2 font-semibold text-red-600">
-                    Storage full
-                  </span>
-                )}
-              </span>
-              <span>
-                {usage.file_count} {usage.file_count === 1 ? 'file' : 'files'}
-              </span>
-            </div>
-            {usage.limit_bytes > 0 && (
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className={`h-full rounded-full transition-all ${storageFull ? 'bg-red-500' : 'bg-blue-600'}`}
-                  style={{ width: `${usagePercent}%` }}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {usage && <DriveStorageUsage storageFull={storageFull} usage={usage} />}
 
         {error && (
           <div
@@ -201,7 +179,6 @@ export function Drive() {
           uploading={uploading}
           uploadZone={uploadZone}
           inputRef={inputRef}
-          folderInputRef={folderInputRef}
           handleUpload={handleUpload}
         />
 
@@ -244,11 +221,18 @@ export function Drive() {
           transfers={transfers}
           selectionBox={selectionBox}
           setDeleteTarget={setDeleteTarget}
-          setShareFile={setShareFile}
+          setShareTarget={setShareTarget}
           setError={setError}
         />
       </section>
-
+      {transfers.folderQueue && (
+        <FolderImportDialog
+          files={transfers.folderQueue.files}
+          addFiles={transfers.addQueuedFolders}
+          close={transfers.closeFolderQueue}
+          start={transfers.startFolderImport}
+        />
+      )}
       {newFolderOpen && (
         <NewFolderDialog
           defaultParentId={folderId ?? null}
@@ -256,33 +240,34 @@ export function Drive() {
           onCreated={refresh}
         />
       )}
-      {shareFile && (
-        <ShareDialog file={shareFile} onClose={() => setShareFile(null)} />
+      {shareTarget && (
+        <ShareDialog
+          target={shareTarget}
+          onClose={() => setShareTarget(null)}
+          openShares={() => {
+            setShareTarget(null);
+            setSharesOpen(true);
+          }}
+        />
       )}
       {sharesOpen && <SharesDialog onClose={() => setSharesOpen(false)} />}
-      {bulkDeleteOpen && (
-        <ConfirmDialog
-          confirmLabel="Delete selected"
-          message={`Permanently delete ${selectedItems.length} selected items? Folders must be empty. This cannot be undone.`}
-          onClose={() => setBulkDeleteOpen(false)}
-          onConfirm={confirmBulkDelete}
-          title="Delete selected items"
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmDialog
-          confirmLabel="Delete"
-          message={
-            deleteTarget.kind === 'file'
-              ? `“${deleteTarget.name}” will be permanently deleted. This cannot be undone.`
-              : `“${deleteTarget.name}” will be permanently deleted. The folder must be empty.`
-          }
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={confirmDelete}
-          title={`Delete ${deleteTarget.kind}`}
-        />
-      )}
+      <DriveDeleteDialogs
+        bulk={bulkDeleteOpen}
+        closeBulk={() => setBulkDeleteOpen(false)}
+        closeTarget={() => setDeleteTarget(null)}
+        count={selectedItems.length}
+        deleteBulk={() =>
+          deleteDriveSelection(
+            selectedItems,
+            selectionKey,
+            setSelection,
+            refresh,
+            showToast,
+          )
+        }
+        deleteTarget={confirmDelete}
+        target={deleteTarget}
+      />
     </main>
   );
 }

@@ -1,18 +1,27 @@
-import { type DragEvent, useCallback, useRef, useState } from 'react';
+import {
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { useDriveToast } from '../components/drive-toast-state';
+import {
+  type DriveFile,
+  type DriveFolder,
+  moveFile,
+  moveFolder,
+  type StorageUsage,
+} from '../lib/drive';
 import {
   DRAG_MIME,
   type DragPayload,
-  type DriveFile,
-  type DriveFolder,
-  importFolder,
   isFileDrag,
   isItemDrag,
-  moveFile,
-  moveFolder,
   parseDragPayload,
-  type StorageUsage,
-  uploadFiles,
-} from '../lib/drive';
+} from '../lib/drive-drag';
+import { importFolder, uploadFiles } from '../lib/drive-uploads';
+import { droppedFolders } from '../lib/dropped-folders';
 import { messageOf } from '../lib/errors';
 import { formatBytes } from '../lib/format';
 
@@ -23,9 +32,16 @@ export function useDriveTransfers(
   refresh: () => void,
   setError: (message: string) => void,
 ) {
+  const showToast = useDriveToast();
   const [uploading, setUploading] = useState(0);
   const [hover, setHover] = useState<string | null>(null);
-  const uploadInProgress = useRef(false);
+  const uploadInProgress = useRef<AbortController | null>(null);
+  const [folderQueue, setFolderQueue] = useState<{
+    files: File[];
+    destination: string | null;
+  } | null>(null);
+
+  useEffect(() => () => uploadInProgress.current?.abort(), []);
 
   const handleUpload = useCallback(
     async (
@@ -38,29 +54,94 @@ export function useDriveTransfers(
       if (usage && usage.limit_bytes > 0) {
         const incoming = uploads.reduce((total, file) => total + file.size, 0);
         if (usage.used_bytes + incoming > usage.limit_bytes) {
-          setError(
-            `Storage is full: these uploads need ${formatBytes(incoming)} but only ${formatBytes(
+          showToast('upload', {
+            kind: 'error',
+            title: 'Not enough storage',
+            message: `These uploads need ${formatBytes(incoming)}, but only ${formatBytes(
               Math.max(usage.limit_bytes - usage.used_bytes, 0),
-            )} is left. Delete files to free space.`,
-          );
+            )} is available.`,
+          });
           return;
         }
       }
-      uploadInProgress.current = true;
-      setUploading(uploads.length);
+      const controller = new AbortController();
+      uploadInProgress.current = controller;
+      const total = uploads.length;
+      setUploading(total);
+      let completed = 0;
+      let failed = 0;
+      let lastError = '';
+      const progressMessage = () =>
+        `${completed.toLocaleString()} of ${total.toLocaleString()} files uploaded`;
+      function showProgress(retryDelay?: number) {
+        const percent = Math.floor(((completed + failed) / total) * 100);
+        const progress = failed
+          ? `${progressMessage()} · ${failed} failed (${percent}% processed)`
+          : `${progressMessage()} (${percent}%)`;
+        showToast('upload', {
+          kind: 'progress',
+          title: asFolder ? 'Importing folder' : 'Uploading files',
+          message: retryDelay
+            ? `${progressMessage()}. Retrying in ${retryDelay} seconds.`
+            : progress,
+          cancel: () => controller.abort(),
+          completed: completed + failed,
+          total,
+        });
+      }
+      function fileUploaded() {
+        completed += 1;
+        showProgress();
+      }
+      showProgress();
+      const options = {
+        signal: controller.signal,
+        onFileUploaded: fileUploaded,
+        onRetry: showProgress,
+      };
       try {
-        if (asFolder) await importFolder(uploads, destination);
-        else await uploadFiles(uploads, destination);
+        if (asFolder) {
+          await importFolder(uploads, destination, {
+            ...options,
+            onFileFailed: (file, cause) => {
+              failed += 1;
+              lastError = `${file.name}: ${messageOf(cause, 'Upload failed.')}`;
+              showProgress();
+            },
+          });
+        } else {
+          await uploadFiles(uploads, destination, options);
+        }
+        controller.signal.throwIfAborted();
         setError('');
+        showToast('upload', {
+          kind: failed ? 'error' : 'success',
+          title: failed
+            ? 'Import finished with errors'
+            : asFolder
+              ? 'Folder imported'
+              : 'Upload complete',
+          message: failed
+            ? `${progressMessage()} · ${failed} failed. ${lastError}`
+            : progressMessage(),
+        });
       } catch (cause) {
-        setError(messageOf(cause, 'Upload failed.'));
+        showToast('upload', {
+          kind: 'error',
+          title: controller.signal.aborted
+            ? 'Upload canceled'
+            : 'Upload stopped',
+          message: controller.signal.aborted
+            ? `${progressMessage()}. Completed files remain in Drive.`
+            : `${progressMessage()}. ${messageOf(cause, 'Upload failed.')}`,
+        });
       } finally {
-        uploadInProgress.current = false;
+        uploadInProgress.current = null;
         setUploading(0);
         refresh();
       }
     },
-    [refresh, setError, usage],
+    [refresh, setError, showToast, usage],
   );
 
   const handleMove = useCallback(
@@ -103,6 +184,33 @@ export function useDriveTransfers(
         event.stopPropagation();
         setHover(null);
         if (isFileDrag(event)) {
+          if (uploadInProgress.current) return;
+          const folders = droppedFolders(event.dataTransfer.items);
+          if (folders) {
+            void folders
+              .then((files) => {
+                if (!files.length) {
+                  showToast('upload', {
+                    kind: 'error',
+                    title: 'No files to import',
+                    message: 'The dropped folders are empty.',
+                  });
+                  return;
+                }
+                setFolderQueue({ files, destination });
+              })
+              .catch((cause: unknown) =>
+                showToast('upload', {
+                  kind: 'error',
+                  title: 'Could not read dropped folders',
+                  message: messageOf(
+                    cause,
+                    'Use the folder picker to try again.',
+                  ),
+                }),
+              );
+            return;
+          }
           const dropped = event.dataTransfer.files;
           if (dropped.length > 0) void handleUpload(dropped, destination);
           return;
@@ -149,7 +257,30 @@ export function useDriveTransfers(
     };
   }
 
+  function addQueuedFolders(files: File[]) {
+    setFolderQueue((queue) => {
+      if (!queue) return null;
+      const paths = new Map(
+        queue.files.map((file) => [file.webkitRelativePath, file]),
+      );
+      for (const file of files) {
+        if (file.webkitRelativePath) paths.set(file.webkitRelativePath, file);
+      }
+      return { ...queue, files: [...paths.values()] };
+    });
+  }
+
   return {
+    folderQueue,
+    openFolderQueue: () =>
+      setFolderQueue({ files: [], destination: folderId ?? null }),
+    closeFolderQueue: () => setFolderQueue(null),
+    addQueuedFolders,
+    startFolderImport: () => {
+      if (!folderQueue?.files.length) return;
+      setFolderQueue(null);
+      void handleUpload(folderQueue.files, folderQueue.destination, true);
+    },
     uploading,
     hover,
     uploadZone,

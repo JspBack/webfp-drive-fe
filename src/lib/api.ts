@@ -146,6 +146,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refreshToken }),
+    signal: init.signal,
   });
   const refreshed = await readJSON<AuthSession | { error?: string }>(
     refreshResponse,

@@ -89,6 +89,7 @@ type DriveToolbarProps = {
   rootZone: DropZone;
   storageFull: boolean;
   uploading: number;
+  onRefresh: () => void;
   onShares: () => void;
   onNewFolder: () => void;
   onImportFolder: () => void;
@@ -102,6 +103,7 @@ export function DriveToolbar({
   rootZone,
   storageFull,
   uploading,
+  onRefresh,
   onShares,
   onNewFolder,
   onImportFolder,
@@ -146,6 +148,13 @@ export function DriveToolbar({
       </nav>
       <div className="flex flex-wrap items-center gap-2.5">
         <button
+          className="inline-flex h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          onClick={onRefresh}
+          type="button"
+        >
+          Refresh
+        </button>
+        <button
           className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
           onClick={onShares}
           type="button"
@@ -168,7 +177,7 @@ export function DriveToolbar({
           type="button"
         >
           <FolderIcon className="size-4" />
-          Import folder
+          Import folders
         </button>
         <button
           className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"

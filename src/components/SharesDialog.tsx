@@ -15,18 +15,25 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    void listShares()
-      .then((items) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function load() {
+      try {
+        const items = await listShares();
         if (cancelled) return;
         setShares(items);
-      })
-      .catch((cause: unknown) => {
+        if (items.some((item) => item.status === 'preparing')) {
+          timer = setTimeout(() => void load(), 3000);
+        }
+      } catch (cause) {
         if (cancelled) return;
-        setShares([]);
+        setShares((previous) => previous ?? []);
         setError(messageOf(cause, 'Unable to load your share links.'));
-      });
+      }
+    }
+    void load();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -96,7 +103,7 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
                 No active share links
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Create one from a file's actions menu.
+                Create one from a file or folder actions menu.
               </p>
             </div>
           </div>
@@ -114,7 +121,9 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
                       {share.filename}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Expires {formatDate(share.expires_at)} ·{' '}
+                      {share.status === 'ready'
+                        ? `Expires ${formatDate(share.expires_at)} · `
+                        : ''}
                       {share.download_count}{' '}
                       {share.download_count === 1 ? 'download' : 'downloads'}
                       {share.max_downloads > 0
@@ -124,25 +133,39 @@ export function SharesDialog({ onClose }: { onClose: () => void }) {
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    Active
+                    {share.status === 'preparing'
+                      ? 'Preparing ZIP'
+                      : share.status === 'failed'
+                        ? 'ZIP failed'
+                        : 'Ready'}
                   </span>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <input
-                    aria-label={`Share link for ${share.filename}`}
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700 outline-none"
-                    onFocus={(event) => event.currentTarget.select()}
-                    readOnly
-                    value={share.url}
-                  />
-                  <button
-                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                    onClick={() => void copy(share)}
-                    type="button"
-                  >
-                    <CopyIcon className="size-3.5" />
-                    {copiedId === share.id ? 'Copied' : 'Copy'}
-                  </button>
+                  {share.url ? (
+                    <>
+                      <input
+                        aria-label={`Share link for ${share.filename}`}
+                        className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700 outline-none"
+                        onFocus={(event) => event.currentTarget.select()}
+                        readOnly
+                        value={share.url}
+                      />
+                      <button
+                        className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                        onClick={() => void copy(share)}
+                        type="button"
+                      >
+                        <CopyIcon className="size-3.5" />
+                        {copiedId === share.id ? 'Copied' : 'Copy'}
+                      </button>
+                    </>
+                  ) : (
+                    <p className="flex-1 self-center text-xs text-slate-500">
+                      {share.status === 'failed'
+                        ? 'Could not prepare this ZIP. Create a new share to retry.'
+                        : 'The download link will appear when the ZIP is ready.'}
+                    </p>
+                  )}
                   <button
                     className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
                     disabled={busyId === share.id}

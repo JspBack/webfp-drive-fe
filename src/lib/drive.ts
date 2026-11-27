@@ -1,6 +1,4 @@
-import type { DragEvent } from 'react';
-
-import { apiRequest, clearAPISession } from './api';
+import { expect, request } from './drive-http';
 
 export type DriveFile = {
   id: string;
@@ -24,13 +22,18 @@ export type DriveFolder = {
   updated_at: string;
 };
 
+export type ShareTarget = { kind: 'file' | 'folder'; id: string; name: string };
+export type ShareStatus = 'preparing' | 'ready' | 'failed';
+
 export type ShareLink = {
+  status: ShareStatus;
   id: string;
   expires_at: string;
   url: string;
 };
 
 export type ShareListItem = {
+  status: ShareStatus;
   id: string;
   file_id: string;
   filename: string;
@@ -47,37 +50,6 @@ export type StorageUsage = {
   limit_bytes: number;
   file_count: number;
 };
-
-export type DragPayload = {
-  kind: 'file' | 'folder';
-  id: string;
-};
-
-export const DRAG_MIME = 'application/x-webfp-item';
-
-async function request(path: string, init?: RequestInit): Promise<Response> {
-  const response = await apiRequest(path, init);
-  if (response.status === 401) {
-    clearAPISession();
-    window.location.assign('/auth/sign-in');
-    throw new Error('Your session has expired. Please sign in again.');
-  }
-  return response;
-}
-
-async function expect(response: Response, fallback: string): Promise<Response> {
-  if (!response.ok) {
-    let message = fallback;
-    try {
-      const body = (await response.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      // keep the fallback message when the body is not JSON
-    }
-    throw new Error(message);
-  }
-  return response;
-}
 
 function scoped(path: string, param: string, id?: string | null): string {
   return id ? `${path}?${param}=${encodeURIComponent(id)}` : path;
@@ -111,21 +83,6 @@ export async function getFolder(id: string): Promise<DriveFolder> {
   return (await response.json()) as DriveFolder;
 }
 
-export async function createFolder(
-  name: string,
-  parentId: string | null,
-): Promise<DriveFolder> {
-  const response = await expect(
-    await request('/api/v1/folders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, parent_id: parentId }),
-    }),
-    'Unable to create the folder.',
-  );
-  return (await response.json()) as DriveFolder;
-}
-
 export async function moveFolder(
   id: string,
   parentId: string | null,
@@ -137,13 +94,6 @@ export async function moveFolder(
       body: JSON.stringify({ parent_id: parentId }),
     }),
     'Unable to move the folder.',
-  );
-}
-
-export async function deleteFolder(id: string): Promise<void> {
-  await expect(
-    await request(`/api/v1/folders/${id}`, { method: 'DELETE' }),
-    'Unable to delete the folder.',
   );
 }
 
@@ -161,55 +111,8 @@ export async function moveFile(
   );
 }
 
-export async function deleteFile(id: string): Promise<void> {
-  await expect(
-    await request(`/api/v1/files/${id}`, { method: 'DELETE' }),
-    'Unable to delete the file.',
-  );
-}
-
-export async function importFolder(
-  files: File[],
-  parentId: string | null,
-): Promise<void> {
-  if (files.some((file) => !file.webkitRelativePath.includes('/'))) {
-    throw new Error('Your browser did not provide the selected folder paths.');
-  }
-  const folders = new Map<string, string>();
-  for (const file of files) {
-    const parts = file.webkitRelativePath.split('/').slice(0, -1);
-    let destination = parentId;
-    let path = '';
-    for (const name of parts) {
-      path += `/${name}`;
-      let id = folders.get(path);
-      if (!id) {
-        id = (await createFolder(name, destination)).id;
-        folders.set(path, id);
-      }
-      destination = id;
-    }
-    await uploadFiles([file], destination);
-  }
-}
-
-export async function uploadFiles(
-  files: File[],
-  folderId: string | null,
-): Promise<void> {
-  for (const file of files) {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    if (folderId) form.append('folder_id', folderId);
-    await expect(
-      await request('/api/v1/files', { method: 'POST', body: form }),
-      `Upload of "${file.name}" failed.`,
-    );
-  }
-}
-
 export async function createShare(
-  fileId: string,
+  target: ShareTarget,
   options: { expiresAt: string; maxDownloads?: number; password?: string },
 ): Promise<ShareLink> {
   const body: Record<string, unknown> = { expires_at: options.expiresAt };
@@ -217,11 +120,14 @@ export async function createShare(
     body.max_downloads = options.maxDownloads;
   if (options.password) body.password = options.password;
   const response = await expect(
-    await request(`/api/v1/files/${fileId}/shares`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
+    await request(
+      `/api/v1/${target.kind === 'folder' ? 'folders' : 'files'}/${target.id}/shares`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    ),
     'Unable to create the share link.',
   );
   return (await response.json()) as ShareLink;
@@ -276,24 +182,4 @@ export async function walkCrumbs(folderId: string): Promise<DriveFolder[]> {
     current = folder.parent_id ?? null;
   }
   return chain;
-}
-
-export function parseDragPayload(raw: string): DragPayload | null {
-  try {
-    const parsed = JSON.parse(raw) as Partial<DragPayload>;
-    if ((parsed.kind === 'file' || parsed.kind === 'folder') && parsed.id) {
-      return { kind: parsed.kind, id: parsed.id };
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-export function isFileDrag(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer.types).includes('Files');
-}
-
-export function isItemDrag(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer.types).includes(DRAG_MIME);
 }

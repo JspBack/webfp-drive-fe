@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
-import { createFolder } from '../lib/drive';
+import { createFolderBatch } from '../lib/drive-batches';
 import { messageOf } from '../lib/errors';
 import { PlusIcon, Spinner, TrashIcon, XIcon } from './icons';
 
@@ -161,7 +161,10 @@ export function NewFolderDialog({
     setBusy(true);
     setError('');
     try {
-      await createFolder(trimmed, defaultParentId);
+      const [result] = await createFolderBatch([
+        { name: trimmed, parent_id: defaultParentId },
+      ]);
+      if (result.error) throw new Error(result.error);
     } catch (cause) {
       setError(messageOf(cause, 'Unable to create the folder.'));
       setBusy(false);

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest } from './api';
-import { importFolder, parseDragPayload, uploadFiles } from './drive';
+import { parseDragPayload } from './drive-drag';
+import { importFolder, uploadFiles } from './drive-uploads';
 
 vi.mock('./api', () => ({ apiRequest: vi.fn(), clearAPISession: vi.fn() }));
 
@@ -19,21 +20,38 @@ describe('folder import', () => {
     const folders: unknown[] = [];
     const uploads: unknown[] = [];
     request.mockImplementation(async (path, options) => {
-      if (path === '/api/v1/folders' && typeof options?.body === 'string') {
-        folders.push(JSON.parse(options.body));
-        return Response.json({ id: `folder-${folders.length}` });
+      if (
+        path === '/api/v1/folders/batch' &&
+        typeof options?.body === 'string'
+      ) {
+        const { folders: batch } = JSON.parse(options.body) as {
+          folders: unknown[];
+        };
+        return Response.json(
+          batch.map((folder) => {
+            folders.push(folder);
+            return { folder: { id: `folder-${folders.length}` } };
+          }),
+        );
       }
-      if (path === '/api/v1/files' && options?.body instanceof FormData) {
-        const file = options.body.get('file');
-        uploads.push([
-          file instanceof File ? file.name : null,
-          options.body.get('folder_id'),
-        ]);
-        return new Response(null, { status: 201 });
+      if (
+        path.startsWith('/api/v1/files/batch') &&
+        options?.body instanceof FormData
+      ) {
+        const folderId = new URL(path, 'https://example.test').searchParams.get(
+          'folder_id',
+        );
+        return Response.json(
+          options.body.getAll('file').map((file) => {
+            uploads.push([file instanceof File ? file.name : null, folderId]);
+            return {};
+          }),
+        );
       }
       throw new Error(`Unexpected request to ${path}`);
     });
 
+    const onFileUploaded = vi.fn();
     await importFolder(
       [
         pickedFile('Reports/January/a.txt'),
@@ -41,7 +59,9 @@ describe('folder import', () => {
         pickedFile('Reports/root.txt'),
       ],
       'destination',
+      { onFileUploaded },
     );
+    expect(onFileUploaded).toHaveBeenCalledTimes(3);
 
     expect(folders).toEqual([
       { name: 'Reports', parent_id: 'destination' },
@@ -52,6 +72,32 @@ describe('folder import', () => {
       ['b.txt', 'folder-2'],
       ['root.txt', 'folder-1'],
     ]);
+  });
+
+  it('continues to another folder after a file permanently fails', async () => {
+    request
+      .mockResolvedValueOnce(
+        Response.json([
+          { folder: { id: 'first-folder' } },
+          { folder: { id: 'second-folder' } },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json([{ error: 'Too large' }], { status: 201 }),
+      )
+      .mockResolvedValueOnce(Response.json([{}], { status: 201 }));
+    const onFileUploaded = vi.fn();
+    const onFileFailed = vi.fn();
+    const first = pickedFile('First/large.txt');
+
+    await importFolder([first, pickedFile('Second/small.txt')], null, {
+      onFileUploaded,
+      onFileFailed,
+    });
+
+    expect(onFileFailed).toHaveBeenCalledWith(first, expect.any(Error));
+    expect(onFileUploaded).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledTimes(3);
   });
 
   it('rejects a selection without relative paths before changing the drive', async () => {
@@ -72,7 +118,7 @@ describe('uploads', () => {
       'Quota exceeded',
     );
     const [path, options] = request.mock.calls[0];
-    expect(path).toBe('/api/v1/files');
+    expect(path).toBe('/api/v1/files/batch');
     expect(options?.method).toBe('POST');
     expect(
       options?.body instanceof FormData && !options.body.has('folder_id'),

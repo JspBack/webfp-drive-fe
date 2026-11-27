@@ -9,6 +9,7 @@ import {
   TrashIcon,
 } from '../components/icons';
 import { KebabMenu } from '../components/KebabMenu';
+import type { ShareTarget } from '../lib/drive';
 import { type DriveFile, type DriveFolder, downloadFile } from '../lib/drive';
 import { messageOf } from '../lib/errors';
 import { formatBytes, formatDate } from '../lib/format';
@@ -63,7 +64,7 @@ type GridProps = {
     name: string,
   ) => ReactNode;
   setDeleteTarget: (target: DeleteTarget) => void;
-  setShareFile: (file: DriveFile) => void;
+  setShareTarget: (target: ShareTarget) => void;
   setError: (message: string) => void;
 };
 
@@ -74,7 +75,7 @@ export function DriveGrid({
   transfers,
   selectionBox,
   setDeleteTarget,
-  setShareFile,
+  setShareTarget,
   setError,
 }: GridProps) {
   const { hover, gridZone, folderTileProps, fileTileProps } = transfers;
@@ -132,6 +133,16 @@ export function DriveGrid({
                     <KebabMenu
                       actions={[
                         {
+                          label: 'Share as ZIP',
+                          icon: <ShareIcon className="size-4" />,
+                          onSelect: () =>
+                            setShareTarget({
+                              kind: 'folder',
+                              id: folder.id,
+                              name: folder.name,
+                            }),
+                        },
+                        {
                           label: 'Delete',
                           danger: true,
                           icon: <TrashIcon className="size-4" />,
@@ -181,7 +192,12 @@ export function DriveGrid({
                       {
                         label: 'Share',
                         icon: <ShareIcon className="size-4" />,
-                        onSelect: () => setShareFile(file),
+                        onSelect: () =>
+                          setShareTarget({
+                            kind: 'file',
+                            id: file.id,
+                            name: file.filename,
+                          }),
                       },
                       {
                         label: 'Delete',

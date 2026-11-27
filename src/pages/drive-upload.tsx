@@ -1,5 +1,5 @@
 import type { HTMLAttributes, RefObject } from 'react';
-import { Spinner, UploadIcon } from '../components/icons';
+import { UploadIcon } from '../components/icons';
 
 type DriveUploadProps = {
   currentName: string;
@@ -12,7 +12,6 @@ type DriveUploadProps = {
     'onDragOver' | 'onDragLeave' | 'onDrop'
   >;
   inputRef: RefObject<HTMLInputElement | null>;
-  folderInputRef: RefObject<HTMLInputElement | null>;
   handleUpload: (
     files: FileList,
     destination: string | null,
@@ -28,7 +27,6 @@ export function DriveUpload({
   uploading,
   uploadZone,
   inputRef,
-  folderInputRef,
   handleUpload,
 }: DriveUploadProps) {
   return (
@@ -66,12 +64,6 @@ export function DriveUpload({
             <span className="font-semibold text-slate-700">{currentName}</span>
           </span>
         )}
-        {uploading > 0 && (
-          <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white">
-            <Spinner className="size-3.5" />
-            Uploading {uploading} {uploading === 1 ? 'file' : 'files'}…
-          </span>
-        )}
       </button>
 
       <input
@@ -84,25 +76,6 @@ export function DriveUpload({
           event.target.value = '';
         }}
         ref={inputRef}
-        type="file"
-      />
-
-      <input
-        className="hidden"
-        multiple
-        onChange={(event) => {
-          if (event.currentTarget.files)
-            void handleUpload(
-              event.currentTarget.files,
-              folderId ?? null,
-              true,
-            );
-          event.currentTarget.value = '';
-        }}
-        ref={(input) => {
-          folderInputRef.current = input;
-          input?.setAttribute('webkitdirectory', '');
-        }}
         type="file"
       />
     </>

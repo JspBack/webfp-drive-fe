@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 
-import type { DriveFile, ShareLink } from '../lib/drive';
+import type { ShareLink, ShareTarget } from '../lib/drive';
 import { createShare } from '../lib/drive';
 import { messageOf } from '../lib/errors';
 import { Modal } from './dialogs';
@@ -14,10 +14,12 @@ const EXPIRY_CHOICES = [
 ] as const;
 
 export function ShareDialog({
-  file,
+  target,
+  openShares,
   onClose,
 }: {
-  file: DriveFile;
+  target: ShareTarget;
+  openShares: () => void;
   onClose: () => void;
 }) {
   const [expiry, setExpiry] = useState<string>('24h');
@@ -45,7 +47,7 @@ export function ShareDialog({
     setBusy(true);
     setError('');
     try {
-      const created = await createShare(file.id, {
+      const created = await createShare(target, {
         expiresAt: new Date(
           Date.now() + choice.hours * 3_600_000,
         ).toISOString(),
@@ -70,13 +72,32 @@ export function ShareDialog({
     }
   }
 
+  if (share?.status === 'preparing') {
+    return (
+      <Modal
+        description={`The ZIP snapshot of “${target.name}” is being prepared. We’ll email you the link when it’s ready. The expiry period starts after the email is sent.`}
+        footer={
+          <button
+            className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white"
+            onClick={openShares}
+            type="button"
+          >
+            View share links
+          </button>
+        }
+        onClose={onClose}
+        title="Preparing ZIP"
+      />
+    );
+  }
+
   if (share) {
     return (
       <Modal onClose={onClose} title="Share link created">
         <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
             <LinkIcon className="size-4" />
-            Anyone with the link can download “{file.filename}”
+            Anyone with the link can download “{target.name}”
           </div>
           <p className="mt-2 text-xs text-emerald-700">
             Expires {new Date(share.expires_at).toLocaleString()}
@@ -127,9 +148,13 @@ export function ShareDialog({
 
   return (
     <Modal
-      description={`Create a link that lets anyone download “${file.filename}”.`}
+      description={
+        target.kind === 'folder'
+          ? `Create a downloadable ZIP snapshot of “${target.name}”.`
+          : `Create a link that lets anyone download “${target.name}”.`
+      }
       onClose={onClose}
-      title="Share file"
+      title={target.kind === 'folder' ? 'Share folder as ZIP' : 'Share file'}
     >
       <form className="mt-5 space-y-4" onSubmit={(event) => void submit(event)}>
         <div>
