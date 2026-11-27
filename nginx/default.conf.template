@@ -10,6 +10,12 @@ server {
 	charset utf-8;
 
 	client_max_body_size 64m;
+	error_page 413 = @request_too_large;
+
+	location @request_too_large {
+		default_type application/json;
+		return 413 '{"error":"Upload request is too large. Select fewer or smaller files."}';
+	}
 
 	location = /healthz {
 		access_log off;

@@ -2,8 +2,8 @@ import type { DriveFolder } from './drive';
 import { expect, readBatchResults, request } from './drive-http';
 import { retryRateLimited, type UploadOptions } from './upload-retry';
 
-type DeleteBatchItem = { id: string; kind: 'file' | 'folder' };
-type DeleteBatchResult = DeleteBatchItem & { error?: string };
+export type DeleteBatchItem = { id: string; kind: 'file' | 'folder' };
+export type DeleteBatchResult = DeleteBatchItem & { error?: string };
 
 type FolderInput = { name: string; parent_id: string | null };
 type FolderResult = { folder?: DriveFolder; error?: string };

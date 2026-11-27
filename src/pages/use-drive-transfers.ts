@@ -49,9 +49,29 @@ export function useDriveTransfers(
       destination: string | null,
       asFolder = false,
     ) => {
-      const uploads = Array.from(chosen);
-      if (uploads.length === 0 || uploadInProgress.current) return;
-      if (usage && usage.limit_bytes > 0) {
+      const files = Array.from(chosen);
+      if (files.length === 0 || uploadInProgress.current) return;
+      if (!usage) {
+        showToast('upload', {
+          kind: 'error',
+          title: 'Upload limits unavailable',
+          message: 'Refresh Drive to load your upload limits, then try again.',
+        });
+        return;
+      }
+      const uploads = files.filter((file) => file.size <= usage.max_file_bytes);
+      const skipped = files.length - uploads.length;
+      const limitMessage = `The maximum size per file is ${formatBytes(usage.max_file_bytes)}.`;
+      if (skipped && !uploads.length) {
+        showToast('upload', {
+          kind: 'error',
+          title: skipped === 1 ? 'File too large' : 'Files too large',
+          message:
+            skipped === 1 ? `${files[0].name}: ${limitMessage}` : limitMessage,
+        });
+        return;
+      }
+      if (usage.limit_bytes > 0) {
         const incoming = uploads.reduce((total, file) => total + file.size, 0);
         if (usage.used_bytes + incoming > usage.limit_bytes) {
           showToast('upload', {
@@ -66,11 +86,11 @@ export function useDriveTransfers(
       }
       const controller = new AbortController();
       uploadInProgress.current = controller;
-      const total = uploads.length;
-      setUploading(total);
+      const total = files.length;
+      setUploading(uploads.length);
       let completed = 0;
-      let failed = 0;
-      let lastError = '';
+      let failed = skipped;
+      let lastError = skipped ? limitMessage : '';
       const progressMessage = () =>
         `${completed.toLocaleString()} of ${total.toLocaleString()} files uploaded`;
       function showProgress(retryDelay?: number) {
@@ -117,7 +137,9 @@ export function useDriveTransfers(
         showToast('upload', {
           kind: failed ? 'error' : 'success',
           title: failed
-            ? 'Import finished with errors'
+            ? asFolder
+              ? 'Import finished with errors'
+              : 'Upload finished with errors'
             : asFolder
               ? 'Folder imported'
               : 'Upload complete',

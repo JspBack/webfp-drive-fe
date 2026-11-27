@@ -7,7 +7,7 @@ import { TrashIcon } from '../components/icons';
 import { ShareDialog } from '../components/ShareDialog';
 import { SharesDialog } from '../components/SharesDialog';
 import type { ShareTarget } from '../lib/drive';
-import { deleteItems } from '../lib/drive-batches';
+import { deleteDriveItems } from '../lib/drive-delete';
 import { messageOf } from '../lib/errors';
 import { deleteDriveSelection } from './drive-bulk-delete';
 import { DriveDeleteDialogs } from './drive-delete-dialogs';
@@ -69,10 +69,11 @@ function DriveScreen() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await deleteItems([deleteTarget], ([result]) => {
+      await deleteDriveItems([deleteTarget], ([result]) => {
         if (result.error) throw new Error(result.error);
       });
     } catch (cause) {
+      if (deleteTarget.kind === 'folder') refresh();
       showToast('delete', {
         kind: 'error',
         title: 'Delete failed',

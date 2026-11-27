@@ -1,5 +1,5 @@
 import type { ShowDriveToast } from '../components/drive-toast-state';
-import { deleteItems } from '../lib/drive-batches';
+import { deleteDriveItems } from '../lib/drive-delete';
 import { messageOf } from '../lib/errors';
 import type { DeleteTarget } from './drive-grid';
 
@@ -28,7 +28,7 @@ export async function deleteDriveSelection(
     selectedItems.map((item) => [selectionKey(item), item]),
   );
   try {
-    await deleteItems(selectedItems, (results) => {
+    await deleteDriveItems(selectedItems, (results) => {
       for (const result of results) {
         const key = selectionKey(result);
         const item = byItem.get(key);

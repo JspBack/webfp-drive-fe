@@ -48,6 +48,7 @@ export type StorageUsage = {
   plan: 'free' | 'pro' | 'admin';
   used_bytes: number;
   limit_bytes: number;
+  max_file_bytes: number;
   file_count: number;
 };
 

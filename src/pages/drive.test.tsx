@@ -22,13 +22,17 @@ const request = vi.mocked(apiRequest);
 
 function mockDrive({
   full = false,
+  maxFileBytes = 50 * 1024 * 1024,
   plan = 'free',
   folderDeleteFails = false,
+  nested = false,
   upload = async () => Response.json([{}], { status: 201 }),
 }: {
   full?: boolean;
+  maxFileBytes?: number;
   plan?: 'free' | 'pro' | 'admin';
   folderDeleteFails?: boolean;
+  nested?: boolean;
   upload?: (signal?: AbortSignal | null) => Promise<Response>;
 } = {}) {
   let hasFolder = true;
@@ -36,6 +40,18 @@ function mockDrive({
   request.mockImplementation(async (path, options) => {
     if (path === '/api/v1/users/me') {
       return Response.json({ email: 'tester@example.test', name: 'Tester' });
+    }
+
+    if (path.startsWith('/api/v1/folders?parent_id=')) {
+      return Response.json(
+        nested && path.endsWith('folder-1') ? [{ id: 'child' }] : [],
+      );
+    }
+
+    if (path.startsWith('/api/v1/files?folder_id=')) {
+      return Response.json(
+        nested && path.endsWith('child') ? [{ id: 'nested-file' }] : [],
+      );
     }
 
     if (path === '/api/v1/folders') {
@@ -72,6 +88,7 @@ function mockDrive({
         plan,
         used_bytes: full ? 1024 : 256,
         limit_bytes: plan === 'admin' ? 0 : 1024,
+        max_file_bytes: maxFileBytes,
         file_count: Number(hasFile),
       });
     }
@@ -85,10 +102,10 @@ function mockDrive({
       return Response.json(
         ids.map((id) => {
           if (path === '/api/v1/files/batch') {
-            hasFile = false;
+            if (id === 'file-1') hasFile = false;
           } else if (folderDeleteFails) {
             return { id, error: 'Folder must be empty' };
-          } else {
+          } else if (id === 'folder-1') {
             hasFolder = false;
           }
           return { id };
@@ -142,8 +159,8 @@ describe('drive actions', () => {
     ).toBe(false);
   });
 
-  it('deletes selected files and folders and refreshes the grid', async () => {
-    mockDrive();
+  it('deletes selected files and nested folders even when storage is full', async () => {
+    mockDrive({ full: true, nested: true });
     const user = await openDrive();
     const dialog = await openBulkDelete(user);
 
@@ -156,8 +173,13 @@ describe('drive actions', () => {
     expect(
       request.mock.calls
         .filter(([, options]) => options?.method === 'DELETE')
-        .map(([path]) => path),
-    ).toEqual(['/api/v1/files/batch', '/api/v1/folders/batch']);
+        .map(([path, options]) => [path, options?.body]),
+    ).toEqual([
+      ['/api/v1/files/batch', JSON.stringify({ ids: ['file-1'] })],
+      ['/api/v1/files/batch', JSON.stringify({ ids: ['nested-file'] })],
+      ['/api/v1/folders/batch', JSON.stringify({ ids: ['child'] })],
+      ['/api/v1/folders/batch', JSON.stringify({ ids: ['folder-1'] })],
+    ]);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -304,5 +326,22 @@ describe('drive actions', () => {
       expect(request).toHaveBeenCalledWith('/api/v1/folders', undefined);
     });
     expect(selectFile.checked).toBe(true);
+  });
+
+  it('rejects an oversized file before sending a batch request', async () => {
+    mockDrive({ plan: 'admin', maxFileBytes: 4 });
+    const user = await openDrive();
+    const input =
+      document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('File input is missing');
+    await user.upload(input, new File(['too large'], 'large.zip'));
+
+    expect(await screen.findByText('File too large')).toBeTruthy();
+    expect(
+      screen.getByText('large.zip: The maximum size per file is 4 B.'),
+    ).toBeTruthy();
+    expect(
+      request.mock.calls.some(([path]) => path === '/api/v1/files/batch'),
+    ).toBe(false);
   });
 });
